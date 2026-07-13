@@ -73,13 +73,13 @@ Three screens managed as simple navigation states in one activity:
 ```
 Camera2 + MediaRecorder ──► raw.mp4 (app cache, 720p, chosen fps)
         │
-MediaCodec decode ──► frame (YUV) ──► downscale to ≤480p analysis size
+MediaCodec decode ──► frame (YUV luma, 720p)
+        │   (analysis happens at pyramid resolutions ≤360p — no separate downscale pass)
+Gaussian pyramid (4 levels, OpenCV) ──► Laplacian bands Lᵢ = Gᵢ − up(Gᵢ₊₁)
+        │   (bands avoid double-amplifying overlapping spatial frequencies)
+IIR temporal band-pass per band (two running low-pass images; band = 0.4–8 Hz)
         │
-Gaussian pyramid (≈4 levels, OpenCV)
-        │
-IIR temporal band-pass per level (two running low-pass images; band = 0.4–8 Hz)
-        │
-amplify band-passed luma (α = 5/15/30; chroma attenuated to avoid colour blotching)
+amplify band-passed luma (α = 5/15/30; chroma passes through untouched)
         │
 upscale amplified delta ──► add to original 720p frame ──► clamp
         │
