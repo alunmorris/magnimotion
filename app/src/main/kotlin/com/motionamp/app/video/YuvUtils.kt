@@ -8,7 +8,8 @@ import org.opencv.core.Mat
 /** Conversions between YUV_420_888 Images and OpenCV Mats. Luma only is processed. */
 object YuvUtils {
 
-    /** Y plane -> new CV_32FC1 Mat (values 0..255). Caller releases. */
+    /** Y plane -> new CV_32FC1 Mat (values 0..255). Caller releases.
+     *  Y plane pixelStride is assumed to be 1 (guaranteed in practice for YUV_420_888 luma). */
     fun lumaToMat(image: Image): Mat {
         val plane = image.planes[0]
         val w = image.width

@@ -89,8 +89,11 @@ class VideoDecoder(private val inputPath: String) {
                     if (info.size > 0 && !aborted) {
                         val image = codec.getOutputImage(outIdx)
                         if (image != null) {
-                            val keepGoing = onFrame(image, info.presentationTimeUs)
-                            image.close()
+                            val keepGoing = try {
+                                onFrame(image, info.presentationTimeUs)
+                            } finally {
+                                image.close()
+                            }
                             if (!keepGoing) aborted = true
                         }
                     }

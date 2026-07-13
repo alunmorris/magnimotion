@@ -38,10 +38,18 @@ class VideoEncoder(
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }
         codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-        codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        muxer = MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        if (orientationDegrees != 0) muxer.setOrientationHint(orientationDegrees)
-        codec.start()
+        var m: MediaMuxer? = null
+        try {
+            codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            m = MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            if (orientationDegrees != 0) m.setOrientationHint(orientationDegrees)
+            codec.start()
+            muxer = m
+        } catch (t: Throwable) {
+            runCatching { m?.release() }
+            runCatching { codec.release() }
+            throw t
+        }
     }
 
     /** Blocks for a free input buffer, lets [fill] write its YUV Image, queues it. */
@@ -57,19 +65,23 @@ class VideoEncoder(
         drainOutput(untilEos = false)
     }
 
-    /** Send EOS, drain everything, close codec and muxer. Call exactly once. */
+    /** Send EOS, drain everything, close codec and muxer. Call exactly once.
+     *  The encoder must not be reused after any exception. */
     fun finish() {
-        var inIdx = -1
-        while (inIdx < 0) {
-            inIdx = codec.dequeueInputBuffer(10_000)
-            drainOutput(untilEos = false)
+        try {
+            var inIdx = -1
+            while (inIdx < 0) {
+                inIdx = codec.dequeueInputBuffer(10_000)
+                drainOutput(untilEos = false)
+            }
+            codec.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+            drainOutput(untilEos = true)
+            codec.stop()
+            if (muxerStarted) muxer.stop()
+        } finally {
+            runCatching { codec.release() }
+            runCatching { muxer.release() }
         }
-        codec.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-        drainOutput(untilEos = true)
-        codec.stop()
-        codec.release()
-        if (muxerStarted) muxer.stop()
-        muxer.release()
     }
 
     private fun drainOutput(untilEos: Boolean) {
