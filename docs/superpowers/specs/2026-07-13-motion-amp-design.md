@@ -96,8 +96,8 @@ retried without re-recording.
 
 ## Error handling
 
-- **Permissions**: camera + microphone requested with a rationale screen; a
-  permanent denial shows a "grant in settings" screen.
+- **Permissions**: camera only (clips are video-only, so no microphone permission),
+  requested with a rationale screen; a permanent denial shows a "grant in settings" screen.
 - **Capability query failure**: fall back to offering 30 fps only.
 - **Recording failure** (MediaRecorder/Camera2 error): toast + return to idle
   capture state.
