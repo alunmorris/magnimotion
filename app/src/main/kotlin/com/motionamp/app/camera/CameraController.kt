@@ -1,5 +1,5 @@
 // 130726 Initial implementation
-// 130726 Fix: report pre-recording errors via open() callback; honour stop during session configuration
+// 130726 Fix: pre-recording error reporting; stop during configure; clear startInFlight in failRecording
 package com.motionamp.app.camera
 
 import android.annotation.SuppressLint
@@ -180,6 +180,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
     }
 
     private fun failRecording(msg: String) {
+        startInFlight = false
         recorder?.release(); recorder = null
         isRecording = false
         reportError(msg)
