@@ -1,0 +1,98 @@
+// 130726 Initial implementation
+package com.motionamp.app.video
+
+import android.media.Image
+import android.media.MediaCodec
+import android.media.MediaCodecInfo
+import android.media.MediaFormat
+import android.media.MediaMuxer
+
+/**
+ * Synchronous YUV -> H.264 MP4 encoder. Slow motion is baked in by the caller
+ * passing pre-stretched [encodeFrame] timestamps; the muxer just writes them.
+ */
+class VideoEncoder(
+    private val width: Int,
+    private val height: Int,
+    frameRate: Int,
+    bitRate: Int,
+    outputPath: String,
+    orientationDegrees: Int,
+) {
+    private val codec: MediaCodec
+    private val muxer: MediaMuxer
+    private var trackIndex = -1
+    private var muxerStarted = false
+    private val bufferInfo = MediaCodec.BufferInfo()
+
+    init {
+        val format = MediaFormat.createVideoFormat(
+            MediaFormat.MIMETYPE_VIDEO_AVC, width, height,
+        ).apply {
+            setInteger(
+                MediaFormat.KEY_COLOR_FORMAT,
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible,
+            )
+            setInteger(MediaFormat.KEY_BIT_RATE, bitRate)
+            setInteger(MediaFormat.KEY_FRAME_RATE, frameRate.coerceAtLeast(1))
+            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+        }
+        codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        muxer = MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        if (orientationDegrees != 0) muxer.setOrientationHint(orientationDegrees)
+        codec.start()
+    }
+
+    /** Blocks for a free input buffer, lets [fill] write its YUV Image, queues it. */
+    fun encodeFrame(ptsUs: Long, fill: (Image) -> Unit) {
+        var inIdx = -1
+        while (inIdx < 0) {
+            inIdx = codec.dequeueInputBuffer(10_000)
+            drainOutput(untilEos = false)
+        }
+        val image = codec.getInputImage(inIdx) ?: error("encoder input image unavailable")
+        fill(image)
+        codec.queueInputBuffer(inIdx, 0, width * height * 3 / 2, ptsUs, 0)
+        drainOutput(untilEos = false)
+    }
+
+    /** Send EOS, drain everything, close codec and muxer. Call exactly once. */
+    fun finish() {
+        var inIdx = -1
+        while (inIdx < 0) {
+            inIdx = codec.dequeueInputBuffer(10_000)
+            drainOutput(untilEos = false)
+        }
+        codec.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+        drainOutput(untilEos = true)
+        codec.stop()
+        codec.release()
+        if (muxerStarted) muxer.stop()
+        muxer.release()
+    }
+
+    private fun drainOutput(untilEos: Boolean) {
+        while (true) {
+            val outIdx = codec.dequeueOutputBuffer(bufferInfo, if (untilEos) 10_000 else 0)
+            when {
+                outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                    trackIndex = muxer.addTrack(codec.outputFormat)
+                    muxer.start()
+                    muxerStarted = true
+                }
+                outIdx >= 0 -> {
+                    val isConfig = bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
+                    if (bufferInfo.size > 0 && !isConfig) {
+                        val buf = codec.getOutputBuffer(outIdx)!!
+                        muxer.writeSampleData(trackIndex, buf, bufferInfo)
+                    }
+                    val eos = bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
+                    codec.releaseOutputBuffer(outIdx, false)
+                    if (eos) return
+                }
+                else -> if (!untilEos) return // INFO_TRY_AGAIN_LATER; keep looping if draining to EOS
+            }
+        }
+    }
+}
