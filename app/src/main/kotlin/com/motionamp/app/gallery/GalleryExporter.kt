@@ -1,4 +1,5 @@
 // 130726 Initial implementation
+// 130726 Fix: delete pending MediaStore row on failed export; keep never-throws contract
 package com.motionamp.app.gallery
 
 import android.content.ContentValues
@@ -17,10 +18,10 @@ import java.util.Locale
 object GalleryExporter {
 
     fun export(context: Context, file: File): Boolean {
-        if (!file.exists()) return false
-        val name = "motionamp_" +
-            SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".mp4"
         return try {
+            if (!file.exists()) return false
+            val name = "motionamp_" +
+                SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".mp4"
             if (Build.VERSION.SDK_INT >= 29) exportViaMediaStore(context, file, name)
             else exportLegacy(context, file, name)
         } catch (e: Exception) {
@@ -39,13 +40,22 @@ object GalleryExporter {
         }
         val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
             ?: return false
-        resolver.openOutputStream(uri)?.use { out ->
-            file.inputStream().use { it.copyTo(out) }
-        } ?: return false
-        values.clear()
-        values.put(MediaStore.Video.Media.IS_PENDING, 0)
-        resolver.update(uri, values, null, null)
-        return true
+        try {
+            val stream = resolver.openOutputStream(uri)
+            if (stream == null) {
+                resolver.delete(uri, null, null)
+                return false
+            }
+            stream.use { out -> file.inputStream().use { it.copyTo(out) } }
+            values.clear()
+            values.put(MediaStore.Video.Media.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+            return true
+        } catch (e: Exception) {
+            // Don't strand an invisible pending row on a failed copy.
+            runCatching { resolver.delete(uri, null, null) }
+            throw e
+        }
     }
 
     /** API 26-28: direct copy to the public Movies dir + media scan. */
