@@ -52,6 +52,8 @@ class TemporalBandpassTest {
         val f = TemporalBandpass(0.4, 8.0, 30.0)
         val out = run(f, DoubleArray(300) { 100.0 })
         assertTrue("DC leak: ${tailAmplitude(out, 200)}", tailAmplitude(out, 200) < 0.01)
+        val maxAbs = out.takeLast(200).maxOf { kotlin.math.abs(it) }
+        assertTrue("DC offset leak: $maxAbs", maxAbs < 0.01)
         f.release()
     }
 
