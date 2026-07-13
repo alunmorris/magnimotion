@@ -33,6 +33,7 @@ class AmplifyVideoUseCase {
             val bitRate = if (params.captureFps >= 120) 20_000_000 else 12_000_000
             var encoder: VideoEncoder? = null
             var frames = 0
+            var succeeded = false
             try {
                 decoder.decode { image, ptsUs ->
                     if (!isActive) return@decode false
@@ -45,24 +46,32 @@ class AmplifyVideoUseCase {
                         orientationDegrees = info.rotationDegrees,
                     ).also { encoder = it }
                     val luma = YuvUtils.lumaToMat(image)
-                    val amplified = amplifier.amplify(luma)
-                    enc.encodeFrame(ptsUs * params.slowMotionFactor) { dst ->
-                        YuvUtils.writeLuma(amplified, dst)
-                        YuvUtils.copyChroma(image, dst)
+                    try {
+                        val amplified = amplifier.amplify(luma)
+                        try {
+                            enc.encodeFrame(ptsUs * params.slowMotionFactor) { dst ->
+                                YuvUtils.writeLuma(amplified, dst)
+                                YuvUtils.copyChroma(image, dst)
+                            }
+                        } finally {
+                            amplified.release()
+                        }
+                    } finally {
+                        luma.release()
                     }
-                    luma.release()
-                    amplified.release()
                     frames++
                     onProgress(min(0.99f, frames.toFloat() / totalFrames))
                     true
                 }
                 ensureActive() // cancelled mid-decode: fall through to catch, not success
-                encoder?.finish() ?: error("no frames decoded from ${params.inputPath}")
-                encoder = null
+                val enc = encoder ?: error("no frames decoded from ${params.inputPath}")
+                encoder = null // finish() tears the encoder down even on failure; never call it twice
+                enc.finish()
+                succeeded = true
                 onProgress(1f)
             } catch (t: Throwable) {
                 runCatching { encoder?.finish() }
-                File(params.outputPath).delete()
+                if (!succeeded) File(params.outputPath).delete()
                 throw t
             } finally {
                 amplifier.release()
