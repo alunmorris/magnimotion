@@ -1,4 +1,5 @@
 // 130726 Initial implementation
+// 130726 Fix: report pre-recording errors via open() callback; honour stop during session configuration
 package com.motionamp.app.camera
 
 import android.annotation.SuppressLint
@@ -43,8 +44,11 @@ class CameraController(context: Context, private val caps: CameraCaps) {
     private var previewSurface: Surface? = null
     private var listener: Listener? = null
     private var recordingPath: String? = null
+    private var errorCallback: ((String) -> Unit)? = null
     @Volatile var isRecording = false
         private set
+    @Volatile private var startInFlight = false
+    @Volatile private var stopRequested = false
 
     /** High-speed capture requires preview and recorder surfaces at the same size. */
     val previewSize: Size = caps.highSpeedRates.values.firstOrNull() ?: Size(1280, 720)
@@ -55,6 +59,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
 
     @SuppressLint("MissingPermission") // caller gates on CAMERA permission
     fun open(surface: Surface, onError: (String) -> Unit) {
+        errorCallback = onError
         previewSurface = surface
         cameraManager.openCamera(caps.cameraId, object : CameraDevice.StateCallback() {
             override fun onOpened(cam: CameraDevice) {
@@ -71,6 +76,11 @@ class CameraController(context: Context, private val caps: CameraCaps) {
         }, handler)
     }
 
+    /** Errors before the first recording have no Listener yet; fall back to open()'s callback. */
+    private fun reportError(message: String) {
+        (listener?.let { { m: String -> it.onError(m) } } ?: errorCallback)?.invoke(message)
+    }
+
     private fun startPreviewSession() {
         val cam = device ?: return
         val surface = previewSurface ?: return
@@ -85,7 +95,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
                 s.setRepeatingRequest(req.build(), null, handler)
             }
             override fun onConfigureFailed(s: CameraCaptureSession) {
-                listener?.onError("Preview configuration failed")
+                reportError("Preview configuration failed")
             }
         }, handler)
     }
@@ -93,7 +103,9 @@ class CameraController(context: Context, private val caps: CameraCaps) {
     fun startRecording(frameRate: Int, outputFile: File, listener: Listener) {
         val cam = device ?: return listener.onError("Camera not ready")
         val surface = previewSurface ?: return listener.onError("No preview surface")
-        if (isRecording) return
+        if (isRecording || startInFlight) return
+        startInFlight = true
+        stopRequested = false
         this.listener = listener
         recordingPath = outputFile.absolutePath
         session?.close(); session = null
@@ -122,11 +134,16 @@ class CameraController(context: Context, private val caps: CameraCaps) {
                     }
                     rec.start()
                     isRecording = true
+                    startInFlight = false
+                    // A stop tapped while the session was configuring must still stop us.
+                    if (stopRequested) handler.post { stopRecording() }
                 } catch (e: Exception) {
+                    startInFlight = false
                     failRecording("Recording start failed: ${e.message}")
                 }
             }
             override fun onConfigureFailed(s: CameraCaptureSession) {
+                startInFlight = false
                 failRecording("Recording session configuration failed")
             }
         }
@@ -139,7 +156,10 @@ class CameraController(context: Context, private val caps: CameraCaps) {
     }
 
     fun stopRecording() {
-        if (!isRecording) return
+        if (!isRecording) {
+            if (startInFlight) stopRequested = true
+            return
+        }
         isRecording = false
         val path = recordingPath
         val rec = recorder
@@ -162,7 +182,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
     private fun failRecording(msg: String) {
         recorder?.release(); recorder = null
         isRecording = false
-        listener?.onError(msg)
+        reportError(msg)
         startPreviewSession()
     }
 
