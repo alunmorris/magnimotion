@@ -41,7 +41,7 @@ import com.motionamp.app.camera.CameraCapabilities
 import com.motionamp.app.camera.CameraCaps
 import com.motionamp.app.camera.CameraController
 import com.motionamp.core.AmplificationPreset
-import com.motionamp.core.EvmConstants
+import com.motionamp.core.CaptureConstants
 import com.motionamp.core.FRAME_RATE_OPTIONS
 import com.motionamp.core.SlowMotionPreset
 import kotlinx.coroutines.delay
@@ -68,7 +68,7 @@ fun CaptureScreen(viewModel: MainViewModel) {
             val start = System.currentTimeMillis()
             while (isRecording) {
                 recordProgress = ((System.currentTimeMillis() - start).toFloat() /
-                    EvmConstants.MAX_RECORDING_MS).coerceAtMost(1f)
+                    CaptureConstants.MAX_RECORDING_MS).coerceAtMost(1f)
                 delay(100)
             }
         } else {

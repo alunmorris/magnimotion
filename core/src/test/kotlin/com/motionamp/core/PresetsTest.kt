@@ -37,10 +37,7 @@ class PresetsTest {
     }
 
     @Test
-    fun evmConstantsMatchSpec() {
-        assertEquals(0.4, EvmConstants.LOW_CUTOFF_HZ, 0.0)
-        assertEquals(8.0, EvmConstants.HIGH_CUTOFF_HZ, 0.0)
-        assertEquals(4, EvmConstants.PYRAMID_LEVELS)
-        assertEquals(10_000, EvmConstants.MAX_RECORDING_MS)
+    fun captureConstantsMatchSpec() {
+        assertEquals(10_000, CaptureConstants.MAX_RECORDING_MS)
     }
 }

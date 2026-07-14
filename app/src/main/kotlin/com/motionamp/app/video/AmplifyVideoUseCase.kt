@@ -1,7 +1,8 @@
 // 130726 Initial implementation
+// 140726 Replaced EVM luma amplification with optical-flow warping (FlowAmplifier); chroma now warped too
 package com.motionamp.app.video
 
-import com.motionamp.core.MotionAmplifier
+import com.motionamp.core.FlowAmplifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
@@ -10,7 +11,7 @@ import java.io.File
 import kotlin.math.max
 import kotlin.math.min
 
-/** Decode raw.mp4 -> amplify luma per frame -> encode amplified.mp4 with stretched timestamps. */
+/** Decode raw.mp4 -> exaggerate motion per frame -> encode amplified.mp4 with stretched timestamps. */
 class AmplifyVideoUseCase {
 
     data class Params(
@@ -28,7 +29,7 @@ class AmplifyVideoUseCase {
             val info = decoder.readInfo()
             val totalFrames =
                 max(1L, info.durationUs * params.captureFps / 1_000_000L).toInt()
-            val amplifier = MotionAmplifier(params.captureFps.toDouble(), params.alpha)
+            val amplifier = FlowAmplifier(params.alpha)
             // High-speed clips carry far more frames per second of footage.
             val bitRate = if (params.captureFps >= 120) 20_000_000 else 12_000_000
             var encoder: VideoEncoder? = null
@@ -47,14 +48,34 @@ class AmplifyVideoUseCase {
                     ).also { encoder = it }
                     val luma = YuvUtils.lumaToMat(image)
                     try {
-                        val amplified = amplifier.amplify(luma)
-                        try {
+                        val maps = amplifier.computeMaps(luma)
+                        if (maps == null) {
+                            // First frame is the rest-pose reference: pass through unchanged.
                             enc.encodeFrame(ptsUs * params.slowMotionFactor) { dst ->
-                                YuvUtils.writeLuma(amplified, dst)
+                                YuvUtils.writeLuma(luma, dst)
                                 YuvUtils.copyChroma(image, dst)
                             }
-                        } finally {
-                            amplified.release()
+                        } else {
+                            try {
+                                val warpedY = FlowAmplifier.warp(luma, maps.lumaMapX, maps.lumaMapY)
+                                val (u, v) = YuvUtils.chromaToMats(image)
+                                val warpedU = FlowAmplifier.warp(u, maps.chromaMapX, maps.chromaMapY)
+                                val warpedV = FlowAmplifier.warp(v, maps.chromaMapX, maps.chromaMapY)
+                                u.release()
+                                v.release()
+                                try {
+                                    enc.encodeFrame(ptsUs * params.slowMotionFactor) { dst ->
+                                        YuvUtils.writeLuma(warpedY, dst)
+                                        YuvUtils.writeChroma(warpedU, warpedV, dst)
+                                    }
+                                } finally {
+                                    warpedY.release()
+                                    warpedU.release()
+                                    warpedV.release()
+                                }
+                            } finally {
+                                maps.release()
+                            }
                         }
                     } finally {
                         luma.release()

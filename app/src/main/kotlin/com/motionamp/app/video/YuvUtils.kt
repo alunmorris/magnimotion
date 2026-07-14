@@ -1,12 +1,13 @@
 // 130726 Initial implementation
 // 140726 Fix: row-batched chroma copy (per-pixel JNI was ~1e9 calls per high-fps clip)
+// 140726 Added chromaToMats/writeChroma so flow warping can move colour with brightness
 package com.motionamp.app.video
 
 import android.media.Image
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 
-/** Conversions between YUV_420_888 Images and OpenCV Mats. Luma only is processed. */
+/** Conversions between YUV_420_888 Images and OpenCV Mats. */
 object YuvUtils {
 
     /** Y plane -> new CV_32FC1 Mat (values 0..255). Caller releases.
@@ -85,6 +86,73 @@ object YuvUtils {
                     dBuf.position(y * dp.rowStride)
                     dBuf.put(dRow, 0, dLen)
                 }
+            }
+        }
+    }
+
+    /** U and V planes -> two new CV_8UC1 Mats at chroma resolution. Caller releases both. */
+    fun chromaToMats(image: Image): Pair<Mat, Mat> {
+        val cw = image.width / 2
+        val ch = image.height / 2
+        return Pair(
+            planeToMat(image.planes[1], cw, ch),
+            planeToMat(image.planes[2], cw, ch),
+        )
+    }
+
+    /** Write CV_8UC1 chroma Mats into [dst]'s U and V planes, honouring strides. */
+    fun writeChroma(u: Mat, v: Mat, dst: Image) {
+        val cw = dst.width / 2
+        val ch = dst.height / 2
+        writeMatToPlane(u, dst.planes[1], cw, ch)
+        writeMatToPlane(v, dst.planes[2], cw, ch)
+    }
+
+    private fun planeToMat(plane: Image.Plane, w: Int, h: Int): Mat {
+        val m = Mat(h, w, CvType.CV_8UC1)
+        val buf = plane.buffer
+        if (plane.pixelStride == 1) {
+            val row = ByteArray(w)
+            for (y in 0 until h) {
+                buf.position(y * plane.rowStride)
+                buf.get(row, 0, w)
+                m.put(y, 0, row)
+            }
+        } else {
+            val len = (w - 1) * plane.pixelStride + 1
+            val raw = ByteArray(len)
+            val row = ByteArray(w)
+            for (y in 0 until h) {
+                buf.position(y * plane.rowStride)
+                buf.get(raw, 0, len)
+                for (x in 0 until w) row[x] = raw[x * plane.pixelStride]
+                m.put(y, 0, row)
+            }
+        }
+        return m
+    }
+
+    private fun writeMatToPlane(m: Mat, plane: Image.Plane, w: Int, h: Int) {
+        val buf = plane.buffer
+        if (plane.pixelStride == 1) {
+            val row = ByteArray(w)
+            for (y in 0 until h) {
+                m.get(y, 0, row)
+                buf.position(y * plane.rowStride)
+                buf.put(row, 0, w)
+            }
+        } else {
+            // Read-modify-write so the interleaved sibling plane's bytes survive.
+            val len = (w - 1) * plane.pixelStride + 1
+            val raw = ByteArray(len)
+            val row = ByteArray(w)
+            for (y in 0 until h) {
+                buf.position(y * plane.rowStride)
+                buf.get(raw, 0, len)
+                m.get(y, 0, row)
+                for (x in 0 until w) raw[x * plane.pixelStride] = row[x]
+                buf.position(y * plane.rowStride)
+                buf.put(raw, 0, len)
             }
         }
     }

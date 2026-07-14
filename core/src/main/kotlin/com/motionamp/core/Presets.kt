@@ -1,5 +1,6 @@
 // 130726 Initial implementation
 // 140726 Slow motion now stacks on frame-rate normalisation (totalFactorFor): 120fps+½× = 8× slower
+// 140726 EvmConstants → CaptureConstants (EVM replaced by FlowAmplifier)
 package com.motionamp.core
 
 /** Amplification gain applied to the band-passed motion signal. */
@@ -28,13 +29,6 @@ enum class SlowMotionPreset(val factor: Int, val label: String) {
 /** Capture frame rates offered in the UI; availability is device-dependent. */
 val FRAME_RATE_OPTIONS: List<Int> = listOf(30, 60, 120, 240)
 
-object EvmConstants {
-    /** Temporal band amplified, in Hz — broad general-purpose band per spec. */
-    const val LOW_CUTOFF_HZ = 0.4
-    const val HIGH_CUTOFF_HZ = 8.0
-
-    /** Gaussian pyramid depth; the finest full-res level is never amplified. */
-    const val PYRAMID_LEVELS = 4
-
+object CaptureConstants {
     const val MAX_RECORDING_MS = 10_000
 }

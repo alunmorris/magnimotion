@@ -18,7 +18,7 @@ import android.os.HandlerThread
 import android.util.Range
 import android.util.Size
 import android.view.Surface
-import com.motionamp.core.EvmConstants
+import com.motionamp.core.CaptureConstants
 import java.io.File
 
 /**
@@ -213,7 +213,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
         r.setCaptureRate(frameRate.toDouble())
         r.setVideoEncodingBitRate(if (frameRate >= 120) 30_000_000 else 12_000_000)
         r.setOrientationHint(sensorOrientation)
-        r.setMaxDuration(EvmConstants.MAX_RECORDING_MS)
+        r.setMaxDuration(CaptureConstants.MAX_RECORDING_MS)
         r.setOutputFile(outputFile.absolutePath)
         r.setOnInfoListener { _, what, _ ->
             if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {

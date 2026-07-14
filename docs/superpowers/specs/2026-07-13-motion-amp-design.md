@@ -1,21 +1,22 @@
 # Motion Amplifier — Design Spec
 
-Date: 2026-07-13
+Date: 2026-07-13 (amended 2026-07-14: EVM replaced by optical-flow warping after on-device testing)
 Status: Approved approach; spec for implementation planning
 
 ## Overview
 
-An Android app that records a short video clip and exaggerates motion in it using
-linear Eulerian Video Magnification (EVM), the MIT technique. Aimed at general
-curiosity/experimentation: point it at anything (a wobbling table, someone breathing,
-a running motor) and see invisible or subtle motion amplified. Flow is
+An Android app that records a short video clip and exaggerates motion in it by
+optical-flow warping (Lagrangian motion magnification): a part displaced by d from
+its rest position appears displaced by α·d — moving things visibly move further.
+(v1 originally used linear Eulerian Video Magnification; on-device it read as edge
+flicker rather than displacement, so it was replaced.) Flow is
 **record → process → playback**, with a save-to-gallery option. No live amplified
 preview in v1.
 
 ## Goals
 
 - Record a clip (max 10 s) at a user-selected frame rate.
-- Amplify motion by a user-selected factor via linear EVM.
+- Exaggerate displacement by a user-selected factor via optical-flow warping.
 - Play the result in-app, looped, with slow motion baked in.
 - Save the processed clip to the device gallery on demand.
 - Run on a range of devices: capabilities (frame rates) detected at runtime.
@@ -32,11 +33,12 @@ preview in v1.
 | Preset | Options | Notes |
 |---|---|---|
 | Frame rate | 30 / 60 / 120 / 240 fps | Queried from camera at runtime; unsupported chips greyed out. 120/240 use Camera2 constrained high-speed sessions. |
-| Amplification | Low ×5 / Medium ×15 / High ×30 | EVM gain α applied to band-passed signal. |
+| Amplification | Low ×5 / Medium ×15 / High ×30 | Displacement gain α: a part moved d from rest appears moved α·d. |
 | Slow motion | 1× / ½× / ¼× / ⅛× | Stacks on frame-rate normalisation: capture is first slowed to 30 fps effective playback (120 fps clip → 4× slower), then the preset multiplies that (½× on 120 fps → 8× slower). Baked into the processed file by stretching encode timestamps; playback and saved MP4 always match. |
 
-The temporal band-pass is fixed at a broad general-purpose band, 0.4–8 Hz,
-implemented relative to the capture frame rate. Not user-exposed in v1.
+Flow is computed against the first frame (rest pose) at a fixed 640-wide analysis
+resolution (Farneback dense optical flow); the mean flow is subtracted so hand
+shake and panning are not exaggerated. Not user-exposed in v1.
 
 ## Architecture
 
