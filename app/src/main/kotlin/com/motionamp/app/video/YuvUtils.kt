@@ -1,4 +1,5 @@
 // 130726 Initial implementation
+// 140726 Fix: row-batched chroma copy (per-pixel JNI was ~1e9 calls per high-fps clip)
 package com.motionamp.app.video
 
 import android.media.Image
@@ -48,7 +49,8 @@ object YuvUtils {
         mat8.release()
     }
 
-    /** Copy U and V planes from [src] to [dst], honouring each side's strides. */
+    /** Copy U and V planes from [src] to [dst], honouring each side's strides.
+     *  Rows are copied in bulk; the per-pixel path only runs when a side is interleaved. */
     fun copyChroma(src: Image, dst: Image) {
         val cw = src.width / 2
         val ch = src.height / 2
@@ -57,10 +59,31 @@ object YuvUtils {
             val dp = dst.planes[p]
             val sBuf = sp.buffer
             val dBuf = dp.buffer
-            for (y in 0 until ch) {
-                for (x in 0 until cw) {
-                    dBuf.put(y * dp.rowStride + x * dp.pixelStride,
-                        sBuf.get(y * sp.rowStride + x * sp.pixelStride))
+            if (sp.pixelStride == 1 && dp.pixelStride == 1) {
+                val row = ByteArray(cw)
+                for (y in 0 until ch) {
+                    sBuf.position(y * sp.rowStride)
+                    sBuf.get(row, 0, cw)
+                    dBuf.position(y * dp.rowStride)
+                    dBuf.put(row, 0, cw)
+                }
+            } else {
+                // Interleaved (e.g. NV12-style) plane: bulk-read each row span, scatter in
+                // a Java array, read-modify-write so the sibling plane's bytes survive.
+                val sLen = (cw - 1) * sp.pixelStride + 1
+                val dLen = (cw - 1) * dp.pixelStride + 1
+                val sRow = ByteArray(sLen)
+                val dRow = ByteArray(dLen)
+                for (y in 0 until ch) {
+                    sBuf.position(y * sp.rowStride)
+                    sBuf.get(sRow, 0, sLen)
+                    dBuf.position(y * dp.rowStride)
+                    dBuf.get(dRow, 0, dLen)
+                    for (x in 0 until cw) {
+                        dRow[x * dp.pixelStride] = sRow[x * sp.pixelStride]
+                    }
+                    dBuf.position(y * dp.rowStride)
+                    dBuf.put(dRow, 0, dLen)
                 }
             }
         }

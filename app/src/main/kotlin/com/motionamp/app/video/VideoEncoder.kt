@@ -1,4 +1,5 @@
 // 130726 Initial implementation
+// 140726 Fix: queue full input-buffer capacity so stride-padded planes are covered
 package com.motionamp.app.video
 
 import android.media.Image
@@ -59,9 +60,13 @@ class VideoEncoder(
             inIdx = codec.dequeueInputBuffer(10_000)
             drainOutput(untilEos = false)
         }
+        // Real extent of this input buffer (incl. stride padding); width*height*3/2
+        // under-reports on devices that pad plane rows. Read capacity before
+        // getInputImage invalidates the ByteBuffer view.
+        val bufferSize = codec.getInputBuffer(inIdx)?.capacity() ?: (width * height * 3 / 2)
         val image = codec.getInputImage(inIdx) ?: error("encoder input image unavailable")
         fill(image)
-        codec.queueInputBuffer(inIdx, 0, width * height * 3 / 2, ptsUs, 0)
+        codec.queueInputBuffer(inIdx, 0, bufferSize, ptsUs, 0)
         drainOutput(untilEos = false)
     }
 

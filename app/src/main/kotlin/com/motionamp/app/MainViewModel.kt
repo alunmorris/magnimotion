@@ -1,4 +1,5 @@
 // 130726 Initial implementation
+// 140726 Fix: volatile processingJob (written from camera thread, read from main)
 package com.motionamp.app
 
 import android.app.Application
@@ -34,7 +35,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val rawFile: File get() = File(getApplication<Application>().cacheDir, "raw.mp4")
     private val outFile: File get() = File(getApplication<Application>().cacheDir, "amplified.mp4")
 
-    private var processingJob: Job? = null
+    @Volatile private var processingJob: Job? = null
 
     /** Called (from any thread) when the recorder has written rawFile. */
     fun onRecordingFinished(path: String) {

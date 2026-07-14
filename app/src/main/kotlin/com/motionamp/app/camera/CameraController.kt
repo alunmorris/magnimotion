@@ -1,5 +1,6 @@
 // 130726 Initial implementation
 // 130726 Fix: pre-recording error reporting; stop during configure; clear startInFlight in failRecording
+// 140726 Fix: closed flag stops onOpened resurrecting a closed controller; volatile camera fields
 package com.motionamp.app.camera
 
 import android.annotation.SuppressLint
@@ -38,17 +39,18 @@ class CameraController(context: Context, private val caps: CameraCaps) {
     private val appContext = context.applicationContext
     private val thread = HandlerThread("camera").apply { start() }
     private val handler = Handler(thread.looper)
-    private var device: CameraDevice? = null
-    private var session: CameraCaptureSession? = null
-    private var recorder: MediaRecorder? = null
-    private var previewSurface: Surface? = null
-    private var listener: Listener? = null
-    private var recordingPath: String? = null
-    private var errorCallback: ((String) -> Unit)? = null
+    @Volatile private var device: CameraDevice? = null
+    @Volatile private var session: CameraCaptureSession? = null
+    @Volatile private var recorder: MediaRecorder? = null
+    @Volatile private var previewSurface: Surface? = null
+    @Volatile private var listener: Listener? = null
+    @Volatile private var recordingPath: String? = null
+    @Volatile private var errorCallback: ((String) -> Unit)? = null
     @Volatile var isRecording = false
         private set
     @Volatile private var startInFlight = false
     @Volatile private var stopRequested = false
+    @Volatile private var closed = false
 
     /** High-speed capture requires preview and recorder surfaces at the same size. */
     val previewSize: Size = caps.highSpeedRates.values.firstOrNull() ?: Size(1280, 720)
@@ -63,6 +65,10 @@ class CameraController(context: Context, private val caps: CameraCaps) {
         previewSurface = surface
         cameraManager.openCamera(caps.cameraId, object : CameraDevice.StateCallback() {
             override fun onOpened(cam: CameraDevice) {
+                if (closed) { // close() already ran; don't resurrect a torn-down controller
+                    cam.close()
+                    return
+                }
                 device = cam
                 startPreviewSession()
             }
@@ -188,6 +194,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
     }
 
     fun close() {
+        closed = true
         runCatching { recorder?.stop() }
         recorder?.release(); recorder = null
         session?.close(); session = null

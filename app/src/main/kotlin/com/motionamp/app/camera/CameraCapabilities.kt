@@ -1,4 +1,5 @@
 // 130726 Initial implementation
+// 140726 Fix: all high-speed rates share one recording size (preview buffer is configured once)
 package com.motionamp.app.camera
 
 import android.content.Context
@@ -35,13 +36,27 @@ object CameraCapabilities {
         }.ifEmpty { listOf(30) }
 
         val map = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-        val high = mutableMapOf<Int, Size>()
+        val sizeLists = mutableMapOf<Int, List<Size>>()
         map?.highSpeedVideoFpsRanges?.forEach { range ->
             if (range.lower == range.upper && (range.upper == 120 || range.upper == 240)) {
-                val sizes = map.getHighSpeedVideoSizesFor(range)
-                val best = sizes.filter { it.width <= 1280 }.maxByOrNull { it.width * it.height }
-                    ?: sizes.minByOrNull { it.width * it.height }
-                if (best != null) high[range.upper] = best
+                val sizes = map.getHighSpeedVideoSizesFor(range).toList()
+                if (sizes.isNotEmpty()) sizeLists[range.upper] = sizes
+            }
+        }
+        // Constrained high-speed sessions need preview and recorder at the SAME size, and
+        // the preview buffer is configured once — so every offered rate must share one size.
+        val high = mutableMapOf<Int, Size>()
+        if (sizeLists.isNotEmpty()) {
+            val common = sizeLists.values.map { it.toSet() }.reduce { acc, s -> acc intersect s }
+            val best = common.filter { it.width <= 1280 }.maxByOrNull { it.width * it.height }
+                ?: common.minByOrNull { it.width * it.height }
+            if (best != null) {
+                sizeLists.keys.forEach { high[it] = best }
+            } else {
+                // No shared size: offer only the lowest high-speed rate so surfaces always agree.
+                val (rate, sizes) = sizeLists.entries.minBy { it.key }
+                high[rate] = sizes.filter { it.width <= 1280 }.maxByOrNull { it.width * it.height }
+                    ?: sizes.minBy { it.width * it.height }
             }
         }
         return CameraCaps(id, normal, high)
