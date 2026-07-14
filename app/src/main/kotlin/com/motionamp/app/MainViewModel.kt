@@ -1,5 +1,6 @@
 // 130726 Initial implementation
 // 140726 Fix: volatile processingJob (written from camera thread, read from main)
+// 140726 Slow motion stacks on frame-rate normalisation via totalFactorFor
 package com.motionamp.app
 
 import android.app.Application
@@ -48,7 +49,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         outputPath = outFile.absolutePath,
                         captureFps = frameRate.value,
                         alpha = amplification.value.alpha,
-                        slowMotionFactor = slowMotion.value.factor,
+                        // Total stretch: high-fps capture is normalised to 30 fps playback,
+                        // then the preset slows it further (120 fps + half = 8x slower).
+                        slowMotionFactor = slowMotion.value.totalFactorFor(frameRate.value),
                     ),
                 ) { p -> _uiState.value = UiState.Processing(p) }
                 _uiState.value = UiState.Playback(outFile.absolutePath)

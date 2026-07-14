@@ -33,7 +33,7 @@ preview in v1.
 |---|---|---|
 | Frame rate | 30 / 60 / 120 / 240 fps | Queried from camera at runtime; unsupported chips greyed out. 120/240 use Camera2 constrained high-speed sessions. |
 | Amplification | Low ×5 / Medium ×15 / High ×30 | EVM gain α applied to band-passed signal. |
-| Slow motion | 1× / ½× / ¼× / ⅛× | Baked into the processed file by stretching encode timestamps; playback and saved MP4 always match. |
+| Slow motion | 1× / ½× / ¼× / ⅛× | Stacks on frame-rate normalisation: capture is first slowed to 30 fps effective playback (120 fps clip → 4× slower), then the preset multiplies that (½× on 120 fps → 8× slower). Baked into the processed file by stretching encode timestamps; playback and saved MP4 always match. |
 
 The temporal band-pass is fixed at a broad general-purpose band, 0.4–8 Hz,
 implemented relative to the capture frame rate. Not user-exposed in v1.

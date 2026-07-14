@@ -1,5 +1,6 @@
 // 130726 Initial implementation
 // 130726 Fix: run gallery export on Dispatchers.IO instead of the main thread
+// 140726 Fix: keep buttons out of the system navigation bar area (edge-to-edge insets)
 package com.motionamp.app.ui
 
 import android.Manifest
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
@@ -75,7 +77,7 @@ fun PlaybackScreen(videoPath: String, onRetake: () -> Unit, onSaved: (Boolean) -
             modifier = Modifier.weight(1f).fillMaxWidth(),
         )
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             OutlinedButton(onClick = onRetake) { Text("Retake") }

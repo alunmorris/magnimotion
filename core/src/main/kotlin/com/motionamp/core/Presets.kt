@@ -1,4 +1,5 @@
 // 130726 Initial implementation
+// 140726 Slow motion now stacks on frame-rate normalisation (totalFactorFor): 120fps+½× = 8× slower
 package com.motionamp.core
 
 /** Amplification gain applied to the band-passed motion signal. */
@@ -8,12 +9,20 @@ enum class AmplificationPreset(val alpha: Double, val label: String) {
     HIGH(30.0, "×30"),
 }
 
-/** Playback slow-down; encode timestamps are multiplied by [factor]. */
+/** Additional playback slow-down applied on top of the frame-rate normalisation. */
 enum class SlowMotionPreset(val factor: Int, val label: String) {
     X1(1, "1×"),
     X2(2, "½×"),
     X4(4, "¼×"),
     X8(8, "⅛×"),
+    ;
+
+    /**
+     * Total encode-timestamp stretch for a clip captured at [captureFps]: capture is
+     * first normalised to 30 fps playback (120 fps clip → 4× slower), then this preset
+     * multiplies that (½× on a 120 fps clip → 8× slower than real time).
+     */
+    fun totalFactorFor(captureFps: Int): Int = maxOf(1, captureFps / 30) * factor
 }
 
 /** Capture frame rates offered in the UI; availability is device-dependent. */

@@ -1,4 +1,5 @@
 // 130726 Initial implementation
+// 140726 Fix: keep controls out of the system status/navigation bar areas (edge-to-edge insets)
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
@@ -12,8 +13,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -111,7 +114,7 @@ fun CaptureScreen(viewModel: MainViewModel) {
         )
 
         Column(
-            modifier = Modifier.align(Alignment.TopCenter).padding(8.dp),
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             PresetRow(
@@ -139,7 +142,7 @@ fun CaptureScreen(viewModel: MainViewModel) {
 
         // Record button with countdown ring.
         Box(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(32.dp).size(84.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(32.dp).size(84.dp),
             contentAlignment = Alignment.Center,
         ) {
             if (isRecording) {
