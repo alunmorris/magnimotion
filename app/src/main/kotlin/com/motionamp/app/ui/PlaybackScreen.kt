@@ -1,4 +1,5 @@
 // 130726 Initial implementation
+// 130726 Fix: run gallery export on Dispatchers.IO instead of the main thread
 package com.motionamp.app.ui
 
 import android.Manifest
@@ -19,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -29,11 +31,15 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.motionamp.app.gallery.GalleryExporter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
 fun PlaybackScreen(videoPath: String, onRetake: () -> Unit, onSaved: (Boolean) -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val player = remember {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.fromFile(File(videoPath))))
@@ -44,7 +50,14 @@ fun PlaybackScreen(videoPath: String, onRetake: () -> Unit, onSaved: (Boolean) -
     }
     DisposableEffect(Unit) { onDispose { player.release() } }
 
-    fun save() = onSaved(GalleryExporter.export(context, File(videoPath)))
+    fun save() {
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                GalleryExporter.export(context, File(videoPath))
+            }
+            onSaved(ok)
+        }
+    }
 
     // API 26-28 need WRITE_EXTERNAL_STORAGE granted before writing to public Movies.
     val permissionLauncher = rememberLauncherForActivityResult(
