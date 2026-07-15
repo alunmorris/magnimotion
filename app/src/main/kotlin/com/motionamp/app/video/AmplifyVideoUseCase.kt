@@ -2,6 +2,7 @@
 // 140726 Replaced EVM luma amplification with optical-flow warping (FlowAmplifier); chroma now warped too
 // 150726 Rest-pose reference is now the clip's middle frame (symmetric exaggeration of oscillation)
 // 150726 Pipelined: decode/extract feeds a bounded queue; flow+warp+encode run on a parallel worker
+// 150726 At >=120fps, flow is computed every 2nd frame and the warp maps reused between
 package com.motionamp.app.video
 
 import com.motionamp.core.FlowAmplifier
@@ -67,6 +68,10 @@ class AmplifyVideoUseCase {
             var succeeded = false
 
             val worker = launch {
+                // At high frame rates consecutive frames barely differ: compute flow every
+                // 2nd frame and reuse the warp maps between, halving the dominant cost.
+                val flowStride = if (params.captureFps >= 120) 2 else 1
+                var cachedMaps: FlowAmplifier.WarpMaps? = null
                 try {
                     while (true) {
                         val item = runInterruptible { queue.take() }
@@ -81,7 +86,11 @@ class AmplifyVideoUseCase {
                                 outputPath = params.outputPath,
                                 orientationDegrees = info.rotationDegrees,
                             ).also { encoderRef.set(it) }
-                            val maps = amplifier.computeMaps(job.luma)
+                            if (frames % flowStride == 0 || cachedMaps == null) {
+                                cachedMaps?.release()
+                                cachedMaps = amplifier.computeMaps(job.luma)
+                            }
+                            val maps = cachedMaps
                             if (maps == null) {
                                 // Rest-pose reference frame: pass through unchanged.
                                 enc.encodeFrame(job.ptsUs * params.slowMotionFactor) { dst ->
@@ -89,23 +98,19 @@ class AmplifyVideoUseCase {
                                     YuvUtils.writeChroma(job.u, job.v, dst)
                                 }
                             } else {
+                                val warpedY =
+                                    FlowAmplifier.warp(job.luma, maps.lumaMapX, maps.lumaMapY)
+                                val warpedU =
+                                    FlowAmplifier.warp(job.u, maps.chromaMapX, maps.chromaMapY)
+                                val warpedV =
+                                    FlowAmplifier.warp(job.v, maps.chromaMapX, maps.chromaMapY)
                                 try {
-                                    val warpedY =
-                                        FlowAmplifier.warp(job.luma, maps.lumaMapX, maps.lumaMapY)
-                                    val warpedU =
-                                        FlowAmplifier.warp(job.u, maps.chromaMapX, maps.chromaMapY)
-                                    val warpedV =
-                                        FlowAmplifier.warp(job.v, maps.chromaMapX, maps.chromaMapY)
-                                    try {
-                                        enc.encodeFrame(job.ptsUs * params.slowMotionFactor) { dst ->
-                                            YuvUtils.writeLuma(warpedY, dst)
-                                            YuvUtils.writeChroma(warpedU, warpedV, dst)
-                                        }
-                                    } finally {
-                                        warpedY.release(); warpedU.release(); warpedV.release()
+                                    enc.encodeFrame(job.ptsUs * params.slowMotionFactor) { dst ->
+                                        YuvUtils.writeLuma(warpedY, dst)
+                                        YuvUtils.writeChroma(warpedU, warpedV, dst)
                                     }
                                 } finally {
-                                    maps.release()
+                                    warpedY.release(); warpedU.release(); warpedV.release()
                                 }
                             }
                             frames++
@@ -119,6 +124,8 @@ class AmplifyVideoUseCase {
                     workerError.compareAndSet(null, t)
                     drainQueue(queue)
                     if (t is CancellationException) throw t
+                } finally {
+                    cachedMaps?.release()
                 }
             }
 
