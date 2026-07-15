@@ -1,5 +1,6 @@
 // 130726 Initial implementation
 // 140726 Fix: keep controls out of the system status/navigation bar areas (edge-to-edge insets)
+// 150726 Fix: preview letterboxed at the buffer's aspect ratio instead of stretching to screen
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
@@ -12,7 +13,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -110,7 +113,14 @@ fun CaptureScreen(viewModel: MainViewModel) {
                     }
                 }
             },
-            modifier = Modifier.fillMaxSize(),
+            // The buffer is landscape (e.g. 1280x720) shown rotated in portrait: constrain
+            // the view to the rotated aspect ratio and letterbox, otherwise it stretches.
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .aspectRatio(
+                    controller.previewSize.height.toFloat() / controller.previewSize.width,
+                ),
         )
 
         Column(
