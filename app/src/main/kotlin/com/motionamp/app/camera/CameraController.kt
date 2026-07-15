@@ -1,6 +1,7 @@
 // 130726 Initial implementation
 // 130726 Fix: pre-recording error reporting; stop during configure; clear startInFlight in failRecording
 // 140726 Fix: closed flag stops onOpened resurrecting a closed controller; volatile camera fields
+// 150726 Lock focus at record start (freeze preview's lens distance; hunting reads as motion)
 package com.motionamp.app.camera
 
 import android.annotation.SuppressLint
@@ -11,6 +12,8 @@ import android.hardware.camera2.CameraConstrainedHighSpeedCaptureSession
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
+import android.hardware.camera2.TotalCaptureResult
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.Handler
@@ -50,6 +53,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
         private set
     @Volatile private var startInFlight = false
     @Volatile private var stopRequested = false
+    @Volatile private var lastFocusDistance: Float? = null
     @Volatile private var closed = false
 
     /** High-speed capture requires preview and recorder surfaces at the same size. */
@@ -98,7 +102,17 @@ class CameraController(context: Context, private val caps: CameraCaps) {
                     addTarget(surface)
                     set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(30, 30))
                 }
-                s.setRepeatingRequest(req.build(), null, handler)
+                // Track where the lens has focused so recording can freeze it there.
+                val focusTracker = object : CameraCaptureSession.CaptureCallback() {
+                    override fun onCaptureCompleted(
+                        session: CameraCaptureSession,
+                        request: CaptureRequest,
+                        result: TotalCaptureResult,
+                    ) {
+                        result.get(CaptureResult.LENS_FOCUS_DISTANCE)?.let { lastFocusDistance = it }
+                    }
+                }
+                s.setRepeatingRequest(req.build(), focusTracker, handler)
             }
             override fun onConfigureFailed(s: CameraCaptureSession) {
                 reportError("Preview configuration failed")
@@ -132,6 +146,12 @@ class CameraController(context: Context, private val caps: CameraCaps) {
                         addTarget(surface)
                         addTarget(rec.surface)
                         set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, Range(frameRate, frameRate))
+                        // Freeze focus where the preview converged: mid-clip focus hunting
+                        // reads as motion to the flow amplifier.
+                        lastFocusDistance?.let { focus ->
+                            set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
+                            set(CaptureRequest.LENS_FOCUS_DISTANCE, focus)
+                        }
                     }.build()
                     if (s is CameraConstrainedHighSpeedCaptureSession) {
                         s.setRepeatingBurst(s.createHighSpeedRequestList(req), null, handler)
