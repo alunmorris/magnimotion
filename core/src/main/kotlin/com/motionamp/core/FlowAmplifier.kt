@@ -1,6 +1,7 @@
 // 140726 Initial implementation — optical-flow warping replaces the EVM amplifier
 // 150726 setReference: allow a preset rest pose (clip middle frame) instead of the first frame
 // 150726 Farneback → DIS optical flow (ULTRAFAST preset): several times faster per frame
+// 150726 Fix: smooth flow (spatial propagation + Gaussian) — DIS patch edges became blocks at high gain
 package com.motionamp.core
 
 import org.opencv.core.Core
@@ -41,7 +42,11 @@ class FlowAmplifier(private val alpha: Double) {
     private var reference: Mat? = null // analysis-resolution CV_8UC1 rest pose
 
     // DIS ultrafast is several times quicker than Farneback at comparable quality.
-    private val dis: DISOpticalFlow = DISOpticalFlow.create(DISOpticalFlow.PRESET_ULTRAFAST)
+    // Spatial propagation smooths its coarse patch grid at almost no cost.
+    private val dis: DISOpticalFlow =
+        DISOpticalFlow.create(DISOpticalFlow.PRESET_ULTRAFAST).apply {
+            useSpatialPropagation = true
+        }
 
     /**
      * Use [luma] (full resolution) as the rest-pose reference instead of the first
@@ -72,6 +77,9 @@ class FlowAmplifier(private val alpha: Double) {
         val flow = Mat()
         dis.calc(ref, analysis, flow)
         analysis.release()
+        // DIS works in ~8 px patches; at high gain the (α−1) multiplier turns patch-edge
+        // discontinuities into visible blocks. Smooth the field before scaling.
+        Imgproc.GaussianBlur(flow, flow, Size(21.0, 21.0), 0.0)
 
         // Whole-frame drift (hand shake / pan) must not be exaggerated.
         val mean = Core.mean(flow)
