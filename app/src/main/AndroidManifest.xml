@@ -7,7 +7,7 @@
 
     <application
         android:name=".MotionAmpApplication"
-        android:label="Motion Amp"
+        android:label="Video Motion Amplification"
         android:theme="@style/Theme.MotionAmp">
         <activity
             android:name=".MainActivity"

@@ -2,6 +2,7 @@
 // 140726 Fix: keep controls out of the system status/navigation bar areas (edge-to-edge insets)
 // 150726 Fix: preview letterboxed at the buffer's aspect ratio instead of stretching to screen
 // 150726 Fix: re-acquire the camera on resume after another app took it
+// 150726 Added on-screen title "Video Motion Amplification"
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -141,6 +143,12 @@ fun CaptureScreen(viewModel: MainViewModel) {
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Text(
+                text = "Video Motion Amplification",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
             PresetRow(
                 options = FRAME_RATE_OPTIONS,
                 selected = frameRate,
