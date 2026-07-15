@@ -2,6 +2,7 @@
 // 130726 Fix: pre-recording error reporting; stop during configure; clear startInFlight in failRecording
 // 140726 Fix: closed flag stops onOpened resurrecting a closed controller; volatile camera fields
 // 150726 Lock focus at record start (freeze preview's lens distance; hunting reads as motion)
+// 150726 Fix: reopenIfNeeded() re-acquires the camera after another app took it
 package com.motionamp.app.camera
 
 import android.annotation.SuppressLint
@@ -54,6 +55,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
     @Volatile private var startInFlight = false
     @Volatile private var stopRequested = false
     @Volatile private var lastFocusDistance: Float? = null
+    @Volatile private var opening = false
     @Volatile private var closed = false
 
     /** High-speed capture requires preview and recorder surfaces at the same size. */
@@ -63,12 +65,23 @@ class CameraController(context: Context, private val caps: CameraCaps) {
         cameraManager.getCameraCharacteristics(caps.cameraId)
             .get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
 
-    @SuppressLint("MissingPermission") // caller gates on CAMERA permission
     fun open(surface: Surface, onError: (String) -> Unit) {
         errorCallback = onError
         previewSurface = surface
+        openDevice()
+    }
+
+    /** Re-acquire the camera after another app took it (onDisconnected nulls [device]). */
+    fun reopenIfNeeded() {
+        if (device == null && !opening && !closed && previewSurface != null) openDevice()
+    }
+
+    @SuppressLint("MissingPermission") // caller gates on CAMERA permission
+    private fun openDevice() {
+        opening = true
         cameraManager.openCamera(caps.cameraId, object : CameraDevice.StateCallback() {
             override fun onOpened(cam: CameraDevice) {
+                opening = false
                 if (closed) { // close() already ran; don't resurrect a torn-down controller
                     cam.close()
                     return
@@ -77,11 +90,13 @@ class CameraController(context: Context, private val caps: CameraCaps) {
                 startPreviewSession()
             }
             override fun onDisconnected(cam: CameraDevice) {
-                cam.close(); device = null
+                opening = false
+                cam.close(); device = null; session = null
             }
             override fun onError(cam: CameraDevice, error: Int) {
-                cam.close(); device = null
-                onError("Camera error $error")
+                opening = false
+                cam.close(); device = null; session = null
+                reportError("Camera error $error")
             }
         }, handler)
     }

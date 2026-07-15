@@ -1,6 +1,7 @@
 // 130726 Initial implementation
 // 140726 Fix: keep controls out of the system status/navigation bar areas (edge-to-edge insets)
 // 150726 Fix: preview letterboxed at the buffer's aspect ratio instead of stretching to screen
+// 150726 Fix: re-acquire the camera on resume after another app took it
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
@@ -37,6 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.motionamp.app.MainViewModel
@@ -64,6 +68,16 @@ fun CaptureScreen(viewModel: MainViewModel) {
     val slowMotion by viewModel.slowMotion.collectAsState()
 
     DisposableEffect(Unit) { onDispose { controller.close() } }
+
+    // Another app can steal the camera (onDisconnected); re-acquire it on resume.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) controller.reopenIfNeeded()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // Countdown ring: recording auto-stops at MAX_RECORDING_MS.
     LaunchedEffect(isRecording) {
