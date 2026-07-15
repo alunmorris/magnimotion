@@ -3,6 +3,7 @@
 // 150726 Fix: preview letterboxed at the buffer's aspect ratio instead of stretching to screen
 // 150726 Fix: re-acquire the camera on resume after another app took it
 // 150726 Added on-screen title "Video Motion Amplification"
+// 150726 Row labels: Amplification, Playback Speed
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
@@ -157,6 +158,7 @@ fun CaptureScreen(viewModel: MainViewModel) {
                 onSelect = { viewModel.frameRate.value = it },
             )
             PresetRow(
+                title = "Amplification",
                 options = AmplificationPreset.entries,
                 selected = amplification,
                 enabled = { !isRecording },
@@ -164,6 +166,7 @@ fun CaptureScreen(viewModel: MainViewModel) {
                 onSelect = { viewModel.amplification.value = it },
             )
             PresetRow(
+                title = "Playback\nSpeed",
                 options = SlowMotionPreset.entries,
                 selected = slowMotion,
                 enabled = { !isRecording },
@@ -210,8 +213,19 @@ private fun <T> PresetRow(
     enabled: (T) -> Boolean,
     label: (T) -> String,
     onSelect: (T) -> Unit,
+    title: String? = null,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (title != null) {
+            Text(
+                text = title,
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
         options.forEach { option ->
             FilterChip(
                 selected = option == selected,
