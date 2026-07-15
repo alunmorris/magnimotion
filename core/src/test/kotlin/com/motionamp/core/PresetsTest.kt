@@ -37,6 +37,11 @@ class PresetsTest {
     }
 
     @Test
+    fun startDelaysMatchSpec() {
+        assertEquals(listOf(0, 1, 3, 10), StartDelayPreset.entries.map { it.seconds })
+    }
+
+    @Test
     fun captureConstantsMatchSpec() {
         assertEquals(10_000, CaptureConstants.MAX_RECORDING_MS)
     }

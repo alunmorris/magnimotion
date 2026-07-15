@@ -5,6 +5,7 @@
 // 150726 Added on-screen title "Video Motion Amplification"
 // 150726 Row labels: Amplification, Playback Speed
 // 150726 App icon added beside the title
+// 150726 Start Delay preset row with cancellable on-screen countdown
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
@@ -38,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +60,10 @@ import com.motionamp.core.AmplificationPreset
 import com.motionamp.core.CaptureConstants
 import com.motionamp.core.FRAME_RATE_OPTIONS
 import com.motionamp.core.SlowMotionPreset
+import com.motionamp.core.StartDelayPreset
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun CaptureScreen(viewModel: MainViewModel) {
@@ -73,6 +78,10 @@ fun CaptureScreen(viewModel: MainViewModel) {
     val frameRate by viewModel.frameRate.collectAsState()
     val amplification by viewModel.amplification.collectAsState()
     val slowMotion by viewModel.slowMotion.collectAsState()
+    val startDelay by viewModel.startDelay.collectAsState()
+    var countdown by remember { mutableStateOf<Int?>(null) }
+    var countdownJob by remember { mutableStateOf<Job?>(null) }
+    val scope = rememberCoroutineScope()
 
     DisposableEffect(Unit) { onDispose { controller.close() } }
 
@@ -187,6 +196,24 @@ fun CaptureScreen(viewModel: MainViewModel) {
                 label = { it.label },
                 onSelect = { viewModel.slowMotion.value = it },
             )
+            PresetRow(
+                title = "Start Delay",
+                options = StartDelayPreset.entries,
+                selected = startDelay,
+                enabled = { !isRecording && countdown == null },
+                label = { it.label },
+                onSelect = { viewModel.startDelay.value = it },
+            )
+        }
+
+        // Start-delay countdown, big and central.
+        countdown?.let { remaining ->
+            Text(
+                text = "$remaining",
+                color = Color.White,
+                style = MaterialTheme.typography.displayLarge,
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
 
         // Record button with countdown ring.
@@ -201,18 +228,40 @@ fun CaptureScreen(viewModel: MainViewModel) {
                     color = Color.Red,
                 )
             }
+            fun beginRecording() {
+                isRecording = true
+                controller.startRecording(frameRate, viewModel.rawFile, listener)
+            }
             Box(
                 modifier = Modifier
                     .size(64.dp)
                     .border(4.dp, Color.White, CircleShape)
                     .padding(8.dp)
-                    .background(if (isRecording) Color.DarkGray else Color.Red, CircleShape)
+                    .background(
+                        when {
+                            isRecording -> Color.DarkGray
+                            countdown != null -> Color.Yellow
+                            else -> Color.Red
+                        },
+                        CircleShape,
+                    )
                     .clickable {
-                        if (isRecording) {
-                            controller.stopRecording()
-                        } else {
-                            isRecording = true
-                            controller.startRecording(frameRate, viewModel.rawFile, listener)
+                        when {
+                            isRecording -> controller.stopRecording()
+                            countdown != null -> { // tap during countdown cancels it
+                                countdownJob?.cancel()
+                                countdownJob = null
+                                countdown = null
+                            }
+                            startDelay.seconds == 0 -> beginRecording()
+                            else -> countdownJob = scope.launch {
+                                for (s in startDelay.seconds downTo 1) {
+                                    countdown = s
+                                    delay(1000)
+                                }
+                                countdown = null
+                                beginRecording()
+                            }
                         }
                     },
             )

@@ -1,6 +1,7 @@
 // 130726 Initial implementation
 // 130726 Fix: run gallery export on Dispatchers.IO instead of the main thread
 // 140726 Fix: keep buttons out of the system navigation bar area (edge-to-edge insets)
+// 150726 Player controls enabled: time bar, seek, play/pause
 package com.motionamp.app.ui
 
 import android.Manifest
@@ -71,7 +72,11 @@ fun PlaybackScreen(videoPath: String, onRetake: () -> Unit, onSaved: (Boolean) -
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     this.player = player
-                    useController = false
+                    // Built-in controls: play/pause, time bar with seek. Tap video to show.
+                    useController = true
+                    controllerShowTimeoutMs = 2500
+                    setShowNextButton(false)
+                    setShowPreviousButton(false)
                 }
             },
             modifier = Modifier.weight(1f).fillMaxWidth(),

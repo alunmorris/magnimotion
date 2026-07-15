@@ -1,6 +1,7 @@
 // 130726 Initial implementation
 // 140726 Fix: volatile processingJob (written from camera thread, read from main)
 // 140726 Slow motion stacks on frame-rate normalisation via totalFactorFor
+// 150726 Added startDelay preset state
 package com.motionamp.app
 
 import android.app.Application
@@ -10,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.motionamp.app.video.AmplifyVideoUseCase
 import com.motionamp.core.AmplificationPreset
 import com.motionamp.core.SlowMotionPreset
+import com.motionamp.core.StartDelayPreset
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val frameRate = MutableStateFlow(30)
     val amplification = MutableStateFlow(AmplificationPreset.MEDIUM)
     val slowMotion = MutableStateFlow(SlowMotionPreset.X1)
+    val startDelay = MutableStateFlow(StartDelayPreset.S0)
     val errorMessage = MutableStateFlow<String?>(null)
 
     val rawFile: File get() = File(getApplication<Application>().cacheDir, "raw.mp4")
