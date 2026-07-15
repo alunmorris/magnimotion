@@ -37,9 +37,9 @@ preview in v1.
 | Slow motion | 1× / ½× / ¼× / ⅛× | Stacks on frame-rate normalisation: capture is first slowed to 30 fps effective playback (120 fps clip → 4× slower), then the preset multiplies that (½× on 120 fps → 8× slower). Baked into the processed file by stretching encode timestamps; playback and saved MP4 always match. |
 
 Flow is computed against the clip's middle frame (rest pose — oscillation is
-exaggerated symmetrically) at a fixed 640-wide analysis resolution (Farneback
-dense optical flow); the mean flow is subtracted so hand shake and panning are
-not exaggerated. Not user-exposed in v1.
+exaggerated symmetrically) at a fixed 640-wide analysis resolution (DIS dense
+optical flow, ULTRAFAST preset); the mean flow is subtracted so hand shake and
+panning are not exaggerated. Not user-exposed in v1.
 
 ## Architecture
 

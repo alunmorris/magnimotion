@@ -1,5 +1,6 @@
 // 140726 Initial implementation — optical-flow warping replaces the EVM amplifier
 // 150726 setReference: allow a preset rest pose (clip middle frame) instead of the first frame
+// 150726 Farneback → DIS optical flow (ULTRAFAST preset): several times faster per frame
 package com.motionamp.core
 
 import org.opencv.core.Core
@@ -8,13 +9,13 @@ import org.opencv.core.Mat
 import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
-import org.opencv.video.Video
+import org.opencv.video.DISOpticalFlow
 
 /**
  * Motion exaggeration by optical-flow warping (Lagrangian magnification).
  *
- * Dense Farneback flow is computed from the first frame (the rest pose) to the
- * current frame at a reduced analysis resolution. The mean flow is subtracted so
+ * Dense DIS optical flow is computed from the reference frame (the rest pose) to
+ * the current frame at a reduced analysis resolution. The mean flow is subtracted so
  * whole-frame drift (hand shake, panning) is not exaggerated. Each output pixel
  * then samples the current frame at x − (α−1)·flow(x), so a part displaced by d
  * from its rest position appears displaced by α·d.
@@ -38,6 +39,9 @@ class FlowAmplifier(private val alpha: Double) {
     }
 
     private var reference: Mat? = null // analysis-resolution CV_8UC1 rest pose
+
+    // DIS ultrafast is several times quicker than Farneback at comparable quality.
+    private val dis: DISOpticalFlow = DISOpticalFlow.create(DISOpticalFlow.PRESET_ULTRAFAST)
 
     /**
      * Use [luma] (full resolution) as the rest-pose reference instead of the first
@@ -66,7 +70,7 @@ class FlowAmplifier(private val alpha: Double) {
             return null
         }
         val flow = Mat()
-        Video.calcOpticalFlowFarneback(ref, analysis, flow, 0.5, 3, 21, 2, 5, 1.1, 0)
+        dis.calc(ref, analysis, flow)
         analysis.release()
 
         // Whole-frame drift (hand shake / pan) must not be exaggerated.
