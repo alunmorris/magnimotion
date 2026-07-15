@@ -1,5 +1,6 @@
 // 130726 Initial implementation
 // 140726 Replaced EVM luma amplification with optical-flow warping (FlowAmplifier); chroma now warped too
+// 150726 Rest-pose reference is now the clip's middle frame (symmetric exaggeration of oscillation)
 package com.motionamp.app.video
 
 import com.motionamp.core.FlowAmplifier
@@ -30,6 +31,13 @@ class AmplifyVideoUseCase {
             val totalFrames =
                 max(1L, info.durationUs * params.captureFps / 1_000_000L).toInt()
             val amplifier = FlowAmplifier(params.alpha)
+            // Middle frame as the rest pose: oscillation is exaggerated symmetrically (+/- alpha*d).
+            // If the seek pre-pass fails, the first streamed frame becomes the reference as before.
+            runCatching { decoder.decodeLumaAt(info.durationUs / 2) }
+                .onSuccess { ref ->
+                    amplifier.setReference(ref)
+                    ref.release()
+                }
             // High-speed clips carry far more frames per second of footage.
             val bitRate = if (params.captureFps >= 120) 20_000_000 else 12_000_000
             var encoder: VideoEncoder? = null

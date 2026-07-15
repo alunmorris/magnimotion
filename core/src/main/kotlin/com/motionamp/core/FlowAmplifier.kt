@@ -1,4 +1,5 @@
 // 140726 Initial implementation — optical-flow warping replaces the EVM amplifier
+// 150726 setReference: allow a preset rest pose (clip middle frame) instead of the first frame
 package com.motionamp.core
 
 import org.opencv.core.Core
@@ -37,6 +38,16 @@ class FlowAmplifier(private val alpha: Double) {
     }
 
     private var reference: Mat? = null // analysis-resolution CV_8UC1 rest pose
+
+    /**
+     * Use [luma] (full resolution) as the rest-pose reference instead of the first
+     * streamed frame — e.g. the clip's middle frame, so oscillating motion is
+     * exaggerated symmetrically around its centre. [luma] stays owned by the caller.
+     */
+    fun setReference(luma: Mat) {
+        reference?.release()
+        reference = toAnalysis(luma)
+    }
     private var gridX: Mat? = null     // cached identity grids, full resolution
     private var gridY: Mat? = null
     private var gridXc: Mat? = null    // cached identity grids, chroma resolution

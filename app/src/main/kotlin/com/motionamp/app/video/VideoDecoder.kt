@@ -1,4 +1,5 @@
 // 130726 Initial implementation
+// 150726 Added seekToUs + decodeLumaAt so the flow reference can be the clip's middle frame
 package com.motionamp.app.video
 
 import android.media.Image
@@ -6,6 +7,7 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import org.opencv.core.Mat
 
 /** Synchronous MP4 -> YUV_420_888 frame decoder (video track only). */
 class VideoDecoder(private val inputPath: String) {
@@ -43,17 +45,35 @@ class VideoDecoder(private val inputPath: String) {
         }
     }
 
+    /** Decode the frame nearest [targetUs] and return its luma as CV_32FC1 (caller releases). */
+    fun decodeLumaAt(targetUs: Long): Mat {
+        var luma: Mat? = null
+        decode(seekToUs = targetUs) { image, ptsUs ->
+            if (ptsUs >= targetUs) {
+                luma = YuvUtils.lumaToMat(image)
+                false // got it; stop decoding
+            } else {
+                true
+            }
+        }
+        return luma ?: error("no frame at ${targetUs}us in $inputPath")
+    }
+
     /**
-     * Decode every frame in order. [onFrame]'s Image is only valid during the
-     * call. Return false from [onFrame] to abort early. Throws on codec errors.
+     * Decode every frame in order (from the sync frame before [seekToUs] if given).
+     * [onFrame]'s Image is only valid during the call. Return false from [onFrame]
+     * to abort early. Throws on codec errors.
      */
-    fun decode(onFrame: (image: Image, ptsUs: Long) -> Boolean) {
+    fun decode(seekToUs: Long = -1L, onFrame: (image: Image, ptsUs: Long) -> Boolean) {
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
         try {
             extractor.setDataSource(inputPath)
             val track = selectVideoTrack(extractor)
             extractor.selectTrack(track)
+            if (seekToUs >= 0) {
+                extractor.seekTo(seekToUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+            }
             val format = extractor.getTrackFormat(track)
             format.setInteger(
                 MediaFormat.KEY_COLOR_FORMAT,

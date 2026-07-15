@@ -89,6 +89,21 @@ class FlowAmplifierTest {
     }
 
     @Test
+    fun presetReferenceAmplifiesFromFirstFrame() {
+        val amp = FlowAmplifier(4.0)
+        val ref = blobFrame(60.0, 60.0)
+        amp.setReference(ref)
+        ref.release()
+        val f1 = blobFrame(63.0, 60.0)
+        val maps = amp.computeMaps(f1)
+        assertTrue("maps should be available immediately after setReference", maps != null)
+        val out = FlowAmplifier.warp(f1, maps!!.lumaMapX, maps.lumaMapY)
+        val outX = centroidX(out)
+        assertTrue("output centroid $outX should be near 72", outX > 68.0 && outX < 76.0)
+        out.release(); maps.release(); f1.release(); amp.release()
+    }
+
+    @Test
     fun mapsMatchRequestedResolutions() {
         val amp = FlowAmplifier(5.0)
         val f0 = blobFrame(60.0, 60.0)
