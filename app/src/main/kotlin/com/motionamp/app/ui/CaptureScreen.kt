@@ -4,11 +4,13 @@
 // 150726 Fix: re-acquire the camera on resume after another app took it
 // 150726 Added on-screen title "Video Motion Amplification"
 // 150726 Row labels: Amplification, Playback Speed
+// 150726 App icon added beside the title
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
 import android.view.Surface
 import android.view.TextureView
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,11 +44,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.motionamp.app.MainViewModel
+import com.motionamp.app.R
 import com.motionamp.app.camera.CameraCapabilities
 import com.motionamp.app.camera.CameraCaps
 import com.motionamp.app.camera.CameraController
@@ -144,12 +148,22 @@ fun CaptureScreen(viewModel: MainViewModel) {
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = "Video Motion Amplification",
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(bottom = 4.dp),
-            )
+            ) {
+                Text(
+                    text = "Video Motion Amplification",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Image(
+                    painter = painterResource(R.drawable.ic_app_icon),
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
             PresetRow(
                 options = FRAME_RATE_OPTIONS,
                 selected = frameRate,
