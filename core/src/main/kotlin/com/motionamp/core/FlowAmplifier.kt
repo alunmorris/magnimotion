@@ -3,6 +3,7 @@
 // 150726 Farneback → DIS optical flow (ULTRAFAST preset): several times faster per frame
 // 150726 Fix: smooth flow (spatial propagation + Gaussian) — DIS patch edges became blocks at high gain
 // 160726 Fix: noise gate — sub-pixel flow noise on static scenes appeared as blobs at high gain
+// 160726 Fix: texture-confidence mask — spurious flow in flat regions warped dark pixels into bright subjects
 package com.motionamp.core
 
 import org.opencv.core.Core
@@ -41,6 +42,7 @@ class FlowAmplifier(private val alpha: Double) {
     }
 
     private var reference: Mat? = null // analysis-resolution CV_8UC1 rest pose
+    private var textureWeight: Mat? = null // analysis-res CV_32FC1 0..1 flow confidence
 
     // DIS ultrafast is several times quicker than Farneback at comparable quality.
     // Spatial propagation smooths its coarse patch grid at almost no cost.
@@ -57,6 +59,8 @@ class FlowAmplifier(private val alpha: Double) {
     fun setReference(luma: Mat) {
         reference?.release()
         reference = toAnalysis(luma)
+        textureWeight?.release()
+        textureWeight = textureWeightFor(reference!!)
     }
     private var gridX: Mat? = null     // cached identity grids, full resolution
     private var gridY: Mat? = null
@@ -73,6 +77,8 @@ class FlowAmplifier(private val alpha: Double) {
         val ref = reference
         if (ref == null) {
             reference = analysis
+            textureWeight?.release()
+            textureWeight = textureWeightFor(analysis)
             return null
         }
         val flow = Mat()
@@ -103,6 +109,14 @@ class FlowAmplifier(private val alpha: Double) {
         Core.multiply(gate[0], weight, gate[0])
         Core.multiply(gate[1], weight, gate[1])
         weight.release()
+        // Flow is only trustworthy near visible detail: in flat regions (e.g. an
+        // overexposed white subject) DIS invents flow that high gain turns into
+        // large warps dragging in background pixels. Real motion is invisible in
+        // flat areas anyway, so scale flow by the reference's texture confidence.
+        textureWeight?.let {
+            Core.multiply(gate[0], it, gate[0])
+            Core.multiply(gate[1], it, gate[1])
+        }
         Core.merge(gate, flow)
         gate.forEach { it.release() }
 
@@ -122,6 +136,7 @@ class FlowAmplifier(private val alpha: Double) {
 
     fun release() {
         reference?.release(); reference = null
+        textureWeight?.release(); textureWeight = null
         gridX?.release(); gridY?.release(); gridXc?.release(); gridYc?.release()
         gridX = null; gridY = null; gridXc = null; gridYc = null
     }
@@ -147,6 +162,32 @@ class FlowAmplifier(private val alpha: Double) {
         Core.addWeighted(gy, 1.0, channels[1], -(alpha - 1.0) * valueScale, 0.0, mapY)
         channels.forEach { it.release() }
         return mapX to mapY
+    }
+
+    /**
+     * Per-pixel flow confidence (0..1) from the reference's local gradient energy.
+     * Edges vouch for their neighbourhood (DIS patches reach ~8 px), so the mask
+     * is dilated then softened; it is fixed per clip so it cannot flicker.
+     */
+    private fun textureWeightFor(analysis: Mat): Mat {
+        val gx = Mat()
+        val gy = Mat()
+        Imgproc.Sobel(analysis, gx, CvType.CV_32F, 1, 0)
+        Imgproc.Sobel(analysis, gy, CvType.CV_32F, 0, 1)
+        val mag = Mat()
+        Core.magnitude(gx, gy, mag)
+        gx.release(); gy.release()
+        val weight = Mat()
+        Core.subtract(mag, Scalar(TEXTURE_FLOOR), weight)
+        mag.release()
+        Core.multiply(weight, Scalar(1.0 / (TEXTURE_CEIL - TEXTURE_FLOOR)), weight)
+        Core.min(weight, Scalar(1.0), weight)
+        Core.max(weight, Scalar(0.0), weight)
+        val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(17.0, 17.0))
+        Imgproc.dilate(weight, weight, kernel)
+        kernel.release()
+        Imgproc.GaussianBlur(weight, weight, Size(11.0, 11.0), 0.0)
+        return weight
     }
 
     /** Downscale to the analysis width (never upscale) as CV_8UC1 for Farneback. */
@@ -193,6 +234,12 @@ class FlowAmplifier(private val alpha: Double) {
 
         /** Flow at or above this magnitude (analysis px) is amplified at full strength. */
         const val NOISE_CEIL = 1.5
+
+        /** Sobel gradient magnitude below which a pixel counts as textureless. */
+        const val TEXTURE_FLOOR = 20.0
+
+        /** Sobel gradient magnitude giving full flow confidence. */
+        const val TEXTURE_CEIL = 60.0
 
         /** Warp [src] (any single-channel type) through backward maps. Caller releases. */
         fun warp(src: Mat, mapX: Mat, mapY: Mat): Mat {
