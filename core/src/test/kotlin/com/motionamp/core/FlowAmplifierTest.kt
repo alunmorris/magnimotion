@@ -1,4 +1,5 @@
 // 140726 Initial implementation
+// 160726 Added sub-pixel noise-gate test
 package com.motionamp.core
 
 import org.junit.Assert.assertNull
@@ -68,6 +69,21 @@ class FlowAmplifierTest {
         val maxDiff = Core.minMaxLoc(diff).maxVal
         assertTrue("static frame changed by $maxDiff", maxDiff < 5.0)
         diff.release(); out.release(); maps.release(); f1.release(); f0.release(); amp.release()
+    }
+
+    @Test
+    fun subPixelJitterIsNotAmplified() {
+        // A 0.3 px shift is below the noise gate: at alpha 15 it must NOT become
+        // a ~4.5 px blob displacement — the output should track the input.
+        val amp = FlowAmplifier(15.0)
+        val f0 = blobFrame(60.0, 60.0)
+        assertNull(amp.computeMaps(f0))
+        val f1 = blobFrame(60.3, 60.0)
+        val maps = amp.computeMaps(f1)!!
+        val out = FlowAmplifier.warp(f1, maps.lumaMapX, maps.lumaMapY)
+        val outX = centroidX(out)
+        assertTrue("sub-pixel jitter amplified: centroid $outX", outX < 61.5)
+        out.release(); maps.release(); f1.release(); f0.release(); amp.release()
     }
 
     @Test

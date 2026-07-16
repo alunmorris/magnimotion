@@ -2,6 +2,7 @@
 // 150726 setReference: allow a preset rest pose (clip middle frame) instead of the first frame
 // 150726 Farneback → DIS optical flow (ULTRAFAST preset): several times faster per frame
 // 150726 Fix: smooth flow (spatial propagation + Gaussian) — DIS patch edges became blocks at high gain
+// 160726 Fix: noise gate — sub-pixel flow noise on static scenes appeared as blobs at high gain
 package com.motionamp.core
 
 import org.opencv.core.Core
@@ -85,6 +86,26 @@ class FlowAmplifier(private val alpha: Double) {
         val mean = Core.mean(flow)
         Core.subtract(flow, Scalar(mean.`val`[0], mean.`val`[1]), flow)
 
+        // Even on a static scene DIS reports small spurious flow (sensor noise, flat
+        // texture); (α−1) turns it into shimmering blobs. Gate it: magnitudes below
+        // NOISE_FLOOR are zeroed, ramping linearly to full strength at NOISE_CEIL so
+        // real motion passes without a hard edge.
+        val gate = ArrayList<Mat>(2)
+        Core.split(flow, gate)
+        val magnitude = Mat()
+        Core.magnitude(gate[0], gate[1], magnitude)
+        val weight = Mat()
+        Core.subtract(magnitude, Scalar(NOISE_FLOOR), weight)
+        magnitude.release()
+        Core.multiply(weight, Scalar(1.0 / (NOISE_CEIL - NOISE_FLOOR)), weight)
+        Core.min(weight, Scalar(1.0), weight)
+        Core.max(weight, Scalar(0.0), weight)
+        Core.multiply(gate[0], weight, gate[0])
+        Core.multiply(gate[1], weight, gate[1])
+        weight.release()
+        Core.merge(gate, flow)
+        gate.forEach { it.release() }
+
         val w = luma.cols()
         val h = luma.rows()
         val cw = w / 2
@@ -166,6 +187,12 @@ class FlowAmplifier(private val alpha: Double) {
     companion object {
         /** Flow analysis resolution: quality/speed knob (720p luma → 640-wide analysis). */
         const val ANALYSIS_WIDTH = 640
+
+        /** Flow below this magnitude (analysis px) is treated as noise and not amplified. */
+        const val NOISE_FLOOR = 0.5
+
+        /** Flow at or above this magnitude (analysis px) is amplified at full strength. */
+        const val NOISE_CEIL = 1.5
 
         /** Warp [src] (any single-channel type) through backward maps. Caller releases. */
         fun warp(src: Mat, mapX: Mat, mapY: Mat): Mat {
