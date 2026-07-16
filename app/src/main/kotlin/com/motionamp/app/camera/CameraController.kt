@@ -3,6 +3,7 @@
 // 140726 Fix: closed flag stops onOpened resurrecting a closed controller; volatile camera fields
 // 150726 Lock focus at record start (freeze preview's lens distance; hunting reads as motion)
 // 150726 Fix: reopenIfNeeded() re-acquires the camera after another app took it
+// 160726 Fix: orientation hint tracks how the phone is held — landscape clips saved as portrait
 package com.motionamp.app.camera
 
 import android.annotation.SuppressLint
@@ -21,6 +22,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Range
 import android.util.Size
+import android.view.OrientationEventListener
 import android.view.Surface
 import com.motionamp.core.CaptureConstants
 import java.io.File
@@ -64,6 +66,20 @@ class CameraController(context: Context, private val caps: CameraCaps) {
     private val sensorOrientation: Int =
         cameraManager.getCameraCharacteristics(caps.cameraId)
             .get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
+
+    private val lensFacing: Int =
+        cameraManager.getCameraCharacteristics(caps.cameraId)
+            .get(CameraCharacteristics.LENS_FACING) ?: CameraCharacteristics.LENS_FACING_BACK
+
+    // The activity is portrait-locked, so display rotation never reflects how the
+    // phone is held; track the physical orientation ourselves for the video hint.
+    @Volatile private var deviceOrientation = 0
+    private val orientationListener = object : OrientationEventListener(appContext) {
+        override fun onOrientationChanged(orientation: Int) {
+            if (orientation == ORIENTATION_UNKNOWN) return
+            deviceOrientation = ((orientation + 45) / 90 * 90) % 360
+        }
+    }.apply { if (canDetectOrientation()) enable() }
 
     fun open(surface: Surface, onError: (String) -> Unit) {
         errorCallback = onError
@@ -230,6 +246,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
 
     fun close() {
         closed = true
+        orientationListener.disable()
         runCatching { recorder?.stop() }
         recorder?.release(); recorder = null
         session?.close(); session = null
@@ -247,7 +264,14 @@ class CameraController(context: Context, private val caps: CameraCaps) {
         r.setVideoFrameRate(frameRate)
         r.setCaptureRate(frameRate.toDouble())
         r.setVideoEncodingBitRate(if (frameRate >= 120) 30_000_000 else 12_000_000)
-        r.setOrientationHint(sensorOrientation)
+        // Standard Camera2 mapping of sensor + device orientation to output rotation.
+        r.setOrientationHint(
+            if (lensFacing == CameraCharacteristics.LENS_FACING_FRONT) {
+                (sensorOrientation - deviceOrientation + 360) % 360
+            } else {
+                (sensorOrientation + deviceOrientation) % 360
+            },
+        )
         r.setMaxDuration(CaptureConstants.MAX_RECORDING_MS)
         r.setOutputFile(outputFile.absolutePath)
         r.setOnInfoListener { _, what, _ ->
