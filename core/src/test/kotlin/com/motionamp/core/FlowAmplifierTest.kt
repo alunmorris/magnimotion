@@ -1,5 +1,5 @@
 // 140726 Initial implementation
-// 160726 Added sub-pixel noise-gate test
+// 160726 Noise-gate tests replaced by smallMotionIsAmplified after the revert to Farneback
 package com.motionamp.core
 
 import org.junit.Assert.assertNull
@@ -72,24 +72,9 @@ class FlowAmplifierTest {
     }
 
     @Test
-    fun subPixelJitterIsNotAmplified() {
-        // A 0.15 px shift is below the noise floor: at alpha 15 it must NOT become
-        // a ~2 px blob displacement — the output should track the input.
-        val amp = FlowAmplifier(15.0)
-        val f0 = blobFrame(60.0, 60.0)
-        assertNull(amp.computeMaps(f0))
-        val f1 = blobFrame(60.15, 60.0)
-        val maps = amp.computeMaps(f1)!!
-        val out = FlowAmplifier.warp(f1, maps.lumaMapX, maps.lumaMapY)
-        val outX = centroidX(out)
-        assertTrue("sub-pixel jitter amplified: centroid $outX", outX < 61.0)
-        out.release(); maps.release(); f1.release(); f0.release(); amp.release()
-    }
-
-    @Test
-    fun smallMotionSurvivesTheNoiseGate() {
-        // A 1 px shift is real motion: soft shrinkage must leave most of it, so at
-        // alpha 15 the blob lands well beyond its unamplified position (~72 ideal).
+    fun smallMotionIsAmplified() {
+        // A 1 px shift is exactly the kind of small motion the app exists for: at
+        // alpha 15 the blob must land well beyond its unamplified position (~75 ideal).
         val amp = FlowAmplifier(15.0)
         val f0 = blobFrame(60.0, 60.0)
         assertNull(amp.computeMaps(f0))

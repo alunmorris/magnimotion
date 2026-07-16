@@ -3,6 +3,7 @@
 // 150726 Rest-pose reference is now the clip's middle frame (symmetric exaggeration of oscillation)
 // 150726 Pipelined: decode/extract feeds a bounded queue; flow+warp+encode run on a parallel worker
 // 150726 At >=120fps, flow is computed every 2nd frame and the warp maps reused between
+// 160726 Flow stride removed — reused maps stepped visibly in slow motion; flow now per frame again
 package com.motionamp.app.video
 
 import com.motionamp.core.FlowAmplifier
@@ -68,9 +69,6 @@ class AmplifyVideoUseCase {
             var succeeded = false
 
             val worker = launch {
-                // At high frame rates consecutive frames barely differ: compute flow every
-                // 2nd frame and reuse the warp maps between, halving the dominant cost.
-                val flowStride = if (params.captureFps >= 120) 2 else 1
                 var cachedMaps: FlowAmplifier.WarpMaps? = null
                 try {
                     while (true) {
@@ -86,10 +84,8 @@ class AmplifyVideoUseCase {
                                 outputPath = params.outputPath,
                                 orientationDegrees = info.rotationDegrees,
                             ).also { encoderRef.set(it) }
-                            if (frames % flowStride == 0 || cachedMaps == null) {
-                                cachedMaps?.release()
-                                cachedMaps = amplifier.computeMaps(job.luma)
-                            }
+                            cachedMaps?.release()
+                            cachedMaps = amplifier.computeMaps(job.luma)
                             val maps = cachedMaps
                             if (maps == null) {
                                 // Rest-pose reference frame: pass through unchanged.
