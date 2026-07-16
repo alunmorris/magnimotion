@@ -2,6 +2,7 @@
 // 130726 Fix: run gallery export on Dispatchers.IO instead of the main thread
 // 140726 Fix: keep buttons out of the system navigation bar area (edge-to-edge insets)
 // 150726 Player controls enabled: time bar, seek, play/pause
+// 160726 Saved file name carries the capture settings tag (e.g. f120m15)
 package com.motionamp.app.ui
 
 import android.Manifest
@@ -40,7 +41,12 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
-fun PlaybackScreen(videoPath: String, onRetake: () -> Unit, onSaved: (Boolean) -> Unit) {
+fun PlaybackScreen(
+    videoPath: String,
+    nameTag: String,
+    onRetake: () -> Unit,
+    onSaved: (Boolean) -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val player = remember {
@@ -56,7 +62,7 @@ fun PlaybackScreen(videoPath: String, onRetake: () -> Unit, onSaved: (Boolean) -
     fun save() {
         scope.launch {
             val ok = withContext(Dispatchers.IO) {
-                GalleryExporter.export(context, File(videoPath))
+                GalleryExporter.export(context, File(videoPath), nameTag)
             }
             onSaved(ok)
         }

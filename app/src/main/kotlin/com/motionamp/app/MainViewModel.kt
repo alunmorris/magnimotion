@@ -2,6 +2,7 @@
 // 140726 Fix: volatile processingJob (written from camera thread, read from main)
 // 140726 Slow motion stacks on frame-rate normalisation via totalFactorFor
 // 150726 Added startDelay preset state
+// 160726 saveTag: capture settings fragment (e.g. f120m15) for gallery file names
 package com.motionamp.app
 
 import android.app.Application
@@ -35,6 +36,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val slowMotion = MutableStateFlow(SlowMotionPreset.X1)
     val startDelay = MutableStateFlow(StartDelayPreset.S0)
     val errorMessage = MutableStateFlow<String?>(null)
+
+    /** Filename fragment describing the clip's settings, e.g. "f120m15"; the presets
+     *  are locked from record through playback, so reading them at save time is safe. */
+    val saveTag: String
+        get() = "f${frameRate.value}m${amplification.value.alpha.toInt()}"
 
     val rawFile: File get() = File(getApplication<Application>().cacheDir, "raw.mp4")
     private val outFile: File get() = File(getApplication<Application>().cacheDir, "amplified.mp4")

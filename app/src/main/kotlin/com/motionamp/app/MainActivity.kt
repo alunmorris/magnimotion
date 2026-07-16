@@ -82,6 +82,7 @@ fun AppRoot(viewModel: MainViewModel) {
                 }
                 is UiState.Playback -> PlaybackScreen(
                     videoPath = s.videoPath,
+                    nameTag = viewModel.saveTag,
                     onRetake = { viewModel.retake() },
                     onSaved = { ok ->
                         viewModel.postError(

@@ -1,5 +1,6 @@
 // 130726 Initial implementation
 // 130726 Fix: delete pending MediaStore row on failed export; keep never-throws contract
+// 160726 File name carries the capture settings tag (e.g. f120m15)
 package com.motionamp.app.gallery
 
 import android.content.ContentValues
@@ -17,10 +18,12 @@ import java.util.Locale
 /** Copies a processed clip into the device gallery under Movies/MotionAmp. */
 object GalleryExporter {
 
-    fun export(context: Context, file: File): Boolean {
+    /** [tag] names the capture settings (e.g. "f120m15") and lands in the file name. */
+    fun export(context: Context, file: File, tag: String = ""): Boolean {
         return try {
             if (!file.exists()) return false
             val name = "motionamp_" +
+                (if (tag.isNotEmpty()) "${tag}_" else "") +
                 SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".mp4"
             if (Build.VERSION.SDK_INT >= 29) exportViaMediaStore(context, file, name)
             else exportLegacy(context, file, name)
