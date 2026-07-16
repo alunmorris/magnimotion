@@ -6,6 +6,7 @@
 // 150726 Row labels: Amplification, Playback Speed
 // 150726 App icon added beside the title
 // 150726 Start Delay preset row with cancellable on-screen countdown
+// 160726 Info button beside the title opens a usage guide dialog
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
@@ -26,11 +27,19 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +90,7 @@ fun CaptureScreen(viewModel: MainViewModel) {
     val startDelay by viewModel.startDelay.collectAsState()
     var countdown by remember { mutableStateOf<Int?>(null) }
     var countdownJob by remember { mutableStateOf<Job?>(null) }
+    var showInfo by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     DisposableEffect(Unit) { onDispose { controller.close() } }
@@ -172,6 +182,13 @@ fun CaptureScreen(viewModel: MainViewModel) {
                     contentDescription = null,
                     modifier = Modifier.size(28.dp),
                 )
+                IconButton(onClick = { showInfo = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Usage information",
+                        tint = Color.White,
+                    )
+                }
             }
             PresetRow(
                 options = FRAME_RATE_OPTIONS,
@@ -203,6 +220,22 @@ fun CaptureScreen(viewModel: MainViewModel) {
                 enabled = { !isRecording && countdown == null },
                 label = { it.label },
                 onSelect = { viewModel.startDelay.value = it },
+            )
+        }
+
+        if (showInfo) {
+            AlertDialog(
+                onDismissRequest = { showInfo = false },
+                confirmButton = {
+                    TextButton(onClick = { showInfo = false }) { Text("Got it") }
+                },
+                title = { Text("How to use") },
+                text = {
+                    Text(
+                        text = USAGE_TEXT,
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                    )
+                },
             )
         }
 
@@ -268,6 +301,22 @@ fun CaptureScreen(viewModel: MainViewModel) {
         }
     }
 }
+
+private val USAGE_TEXT = """
+    Record a short clip; the app then exaggerates any movement in it.
+
+    Frame rate — higher rates capture fast motion better and play back slower (120 fps plays 4× slower than real time). Greyed-out rates aren't supported by this phone.
+
+    Amplification — how much movement is exaggerated. Start with ×5; ×15 and ×30 suit very small motions (vibration, breathing, sway).
+
+    Playback Speed — extra slow motion on top of the frame-rate slowdown (½× plays 2× slower again).
+
+    Start Delay — countdown before recording begins. Tap the yellow button to cancel it.
+
+    Recording: tap the red button; it stops automatically after 10 seconds, or tap again to stop early. Focus locks the moment recording starts, so point at your subject first. Keep the phone as still as possible — prop it up or use a tripod. Small repetitive movements amplify most cleanly.
+
+    Afterwards the result loops on screen. Tap the video for pause and seek controls, then Retake or Save to gallery.
+""".trimIndent()
 
 @Composable
 private fun <T> PresetRow(
