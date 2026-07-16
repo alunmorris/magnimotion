@@ -5,6 +5,7 @@
 // 160726 Fix: noise gate — sub-pixel flow noise on static scenes appeared as blobs at high gain
 // 160726 Fix: texture-confidence mask — spurious flow in flat regions warped dark pixels into bright subjects
 // 160726 Noise gate softened to magnitude shrinkage — the hard deadband was killing small real motions
+// 160726 Root fix: DIS FAST preset (variational refinement on) replaces ULTRAFAST + Gaussian-blur bodge
 package com.motionamp.core
 
 import org.opencv.core.Core
@@ -45,10 +46,12 @@ class FlowAmplifier(private val alpha: Double) {
     private var reference: Mat? = null // analysis-resolution CV_8UC1 rest pose
     private var textureWeight: Mat? = null // analysis-res CV_32FC1 0..1 flow confidence
 
-    // DIS ultrafast is several times quicker than Farneback at comparable quality.
-    // Spatial propagation smooths its coarse patch grid at almost no cost.
+    // DIS FAST: same quick 8-px patch search as ULTRAFAST, but its 5 variational
+    // refinement iterations produce a smooth field — ULTRAFAST runs none, leaving
+    // piecewise-constant patch blocks that high gain rendered as 8×8 artefacts.
+    // Still much quicker than Farneback.
     private val dis: DISOpticalFlow =
-        DISOpticalFlow.create(DISOpticalFlow.PRESET_ULTRAFAST).apply {
+        DISOpticalFlow.create(DISOpticalFlow.PRESET_FAST).apply {
             useSpatialPropagation = true
         }
 
@@ -85,9 +88,6 @@ class FlowAmplifier(private val alpha: Double) {
         val flow = Mat()
         dis.calc(ref, analysis, flow)
         analysis.release()
-        // DIS works in ~8 px patches; at high gain the (α−1) multiplier turns patch-edge
-        // discontinuities into visible blocks. Smooth the field before scaling.
-        Imgproc.GaussianBlur(flow, flow, Size(21.0, 21.0), 0.0)
 
         // Whole-frame drift (hand shake / pan) must not be exaggerated.
         val mean = Core.mean(flow)
