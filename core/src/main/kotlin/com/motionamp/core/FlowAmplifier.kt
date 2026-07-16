@@ -4,6 +4,7 @@
 // 150726 Fix: smooth flow (spatial propagation + Gaussian) — DIS patch edges became blocks at high gain
 // 160726 Fix: noise gate — sub-pixel flow noise on static scenes appeared as blobs at high gain
 // 160726 Fix: texture-confidence mask — spurious flow in flat regions warped dark pixels into bright subjects
+// 160726 Noise gate softened to magnitude shrinkage — the hard deadband was killing small real motions
 package com.motionamp.core
 
 import org.opencv.core.Core
@@ -92,20 +93,23 @@ class FlowAmplifier(private val alpha: Double) {
         val mean = Core.mean(flow)
         Core.subtract(flow, Scalar(mean.`val`[0], mean.`val`[1]), flow)
 
-        // Even on a static scene DIS reports small spurious flow (sensor noise, flat
-        // texture); (α−1) turns it into shimmering blobs. Gate it: magnitudes below
-        // NOISE_FLOOR are zeroed, ramping linearly to full strength at NOISE_CEIL so
-        // real motion passes without a hard edge.
+        // Even on a static scene DIS reports small spurious flow (sensor noise); (α−1)
+        // turns it into shimmering blobs. Soft-shrink the magnitudes: subtract
+        // NOISE_FLOOR from each vector's length (direction kept, never below zero).
+        // Noise vanishes, while a small real motion loses only NOISE_FLOOR px —
+        // unlike a deadband, which erased the tiny motions this app exists to amplify.
         val gate = ArrayList<Mat>(2)
         Core.split(flow, gate)
         val magnitude = Mat()
         Core.magnitude(gate[0], gate[1], magnitude)
+        val shrunk = Mat()
+        Core.subtract(magnitude, Scalar(NOISE_FLOOR), shrunk)
+        Core.max(shrunk, Scalar(0.0), shrunk)
+        Core.max(magnitude, Scalar(1e-6), magnitude) // guard the division below
         val weight = Mat()
-        Core.subtract(magnitude, Scalar(NOISE_FLOOR), weight)
+        Core.divide(shrunk, magnitude, weight) // per-pixel shrunk/original ratio
+        shrunk.release()
         magnitude.release()
-        Core.multiply(weight, Scalar(1.0 / (NOISE_CEIL - NOISE_FLOOR)), weight)
-        Core.min(weight, Scalar(1.0), weight)
-        Core.max(weight, Scalar(0.0), weight)
         Core.multiply(gate[0], weight, gate[0])
         Core.multiply(gate[1], weight, gate[1])
         weight.release()
@@ -229,11 +233,9 @@ class FlowAmplifier(private val alpha: Double) {
         /** Flow analysis resolution: quality/speed knob (720p luma → 640-wide analysis). */
         const val ANALYSIS_WIDTH = 640
 
-        /** Flow below this magnitude (analysis px) is treated as noise and not amplified. */
-        const val NOISE_FLOOR = 0.5
-
-        /** Flow at or above this magnitude (analysis px) is amplified at full strength. */
-        const val NOISE_CEIL = 1.5
+        /** Magnitude (analysis px) subtracted from every flow vector: noise below this
+         *  vanishes; real motion is amplified after losing only this much. */
+        const val NOISE_FLOOR = 0.2
 
         /** Sobel gradient magnitude below which a pixel counts as textureless. */
         const val TEXTURE_FLOOR = 20.0
