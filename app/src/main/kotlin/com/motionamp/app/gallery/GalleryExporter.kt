@@ -1,6 +1,7 @@
 // 130726 Initial implementation
 // 130726 Fix: delete pending MediaStore row on failed export; keep never-throws contract
 // 160726 File name carries the capture settings tag (e.g. f120m15)
+// 180726 Rename: files magnimotion_*, gallery folder Movies/MagniMotion
 package com.motionamp.app.gallery
 
 import android.content.ContentValues
@@ -15,14 +16,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Copies a processed clip into the device gallery under Movies/MotionAmp. */
+/** Copies a processed clip into the device gallery under Movies/MagniMotion. */
 object GalleryExporter {
 
     /** [tag] names the capture settings (e.g. "f120m15") and lands in the file name. */
     fun export(context: Context, file: File, tag: String = ""): Boolean {
         return try {
             if (!file.exists()) return false
-            val name = "motionamp_" +
+            val name = "magnimotion_" +
                 (if (tag.isNotEmpty()) "${tag}_" else "") +
                 SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".mp4"
             if (Build.VERSION.SDK_INT >= 29) exportViaMediaStore(context, file, name)
@@ -38,7 +39,7 @@ object GalleryExporter {
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, name)
             put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/MotionAmp")
+            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/MagniMotion")
             put(MediaStore.Video.Media.IS_PENDING, 1)
         }
         val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
@@ -65,7 +66,7 @@ object GalleryExporter {
     private fun exportLegacy(context: Context, file: File, name: String): Boolean {
         val dir = Environment
             .getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES)
-            .resolve("MotionAmp")
+            .resolve("MagniMotion")
         if (!dir.exists() && !dir.mkdirs()) return false
         val dst = dir.resolve(name)
         file.copyTo(dst, overwrite = true)

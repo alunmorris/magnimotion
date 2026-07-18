@@ -8,7 +8,7 @@
     <application
         android:name=".MotionAmpApplication"
         android:icon="@drawable/ic_app_icon"
-        android:label="Video Motion Amplification"
+        android:label="MagniMotion"
         android:theme="@style/Theme.MotionAmp">
         <activity
             android:name=".MainActivity"

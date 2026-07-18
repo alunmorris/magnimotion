@@ -8,6 +8,7 @@
 // 150726 Start Delay preset row with cancellable on-screen countdown
 // 160726 Info button beside the title opens a usage guide dialog
 // 180726 Recording Time preset row (2/5/10/60 s); ring and auto-stop follow the selection
+// 180726 App renamed MagniMotion; old title kept as subtitle
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
@@ -175,11 +176,18 @@ fun CaptureScreen(viewModel: MainViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(bottom = 4.dp),
             ) {
-                Text(
-                    text = "Video Motion Amplification",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "MagniMotion",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "Video motion amplification",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
                 Image(
                     painter = painterResource(R.drawable.ic_app_icon),
                     contentDescription = null,
@@ -314,7 +322,7 @@ fun CaptureScreen(viewModel: MainViewModel) {
 }
 
 private val USAGE_TEXT = """
-    Record a short clip; the app then exaggerates any movement in it.
+    Record a short clip; MagniMotion then exaggerates any movement in it.
 
     Frame rate — higher rates capture fast motion better and play back slower (120 fps plays 4× slower than real time). Greyed-out rates aren't supported by this phone.
 
