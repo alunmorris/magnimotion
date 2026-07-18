@@ -17,7 +17,8 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.motionamp.app"
+        // Install identity renamed with the app; code namespace stays com.motionamp.app.
+        applicationId = "com.magnimotion.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

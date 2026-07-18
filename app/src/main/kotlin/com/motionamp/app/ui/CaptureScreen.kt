@@ -9,6 +9,7 @@
 // 160726 Info button beside the title opens a usage guide dialog
 // 180726 Recording Time preset row (2/5/10/60 s); ring and auto-stop follow the selection
 // 180726 App renamed MagniMotion; old title kept as subtitle
+// 180726 Subtitle now "Video Motion Magnification"; icon matches the two-line title height
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
@@ -183,7 +184,7 @@ fun CaptureScreen(viewModel: MainViewModel) {
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = "Video motion amplification",
+                        text = "Video Motion Magnification",
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall,
                     )
@@ -191,7 +192,8 @@ fun CaptureScreen(viewModel: MainViewModel) {
                 Image(
                     painter = painterResource(R.drawable.ic_app_icon),
                     contentDescription = null,
-                    modifier = Modifier.size(28.dp),
+                    // Matches the title column: titleMedium (24sp) + labelSmall (16sp) lines.
+                    modifier = Modifier.size(40.dp),
                 )
                 IconButton(onClick = { showInfo = true }) {
                     Icon(
