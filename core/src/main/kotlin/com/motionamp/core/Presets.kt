@@ -2,6 +2,7 @@
 // 140726 Slow motion now stacks on frame-rate normalisation (totalFactorFor): 120fps+½× = 8× slower
 // 140726 EvmConstants → CaptureConstants (EVM replaced by FlowAmplifier)
 // 150726 Added StartDelayPreset (0/1/3/10 s countdown)
+// 180726 RecordingTimePreset (2/5/10/60 s) replaces fixed MAX_RECORDING_MS
 package com.motionamp.core
 
 /** Amplification gain applied to the band-passed motion signal. */
@@ -35,9 +36,16 @@ enum class StartDelayPreset(val seconds: Int, val label: String) {
     S10(10, "10s"),
 }
 
+/** Recording length; the clip stops automatically once it is reached. */
+enum class RecordingTimePreset(val seconds: Int, val label: String) {
+    S2(2, "2s"),
+    S5(5, "5s"),
+    S10(10, "10s"),
+    S60(60, "60s"),
+    ;
+
+    val millis: Int get() = seconds * 1000
+}
+
 /** Capture frame rates offered in the UI; availability is device-dependent. */
 val FRAME_RATE_OPTIONS: List<Int> = listOf(30, 60, 120, 240)
-
-object CaptureConstants {
-    const val MAX_RECORDING_MS = 10_000
-}

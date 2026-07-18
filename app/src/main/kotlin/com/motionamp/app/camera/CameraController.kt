@@ -4,6 +4,7 @@
 // 150726 Lock focus at record start (freeze preview's lens distance; hunting reads as motion)
 // 150726 Fix: reopenIfNeeded() re-acquires the camera after another app took it
 // 160726 Fix: orientation hint tracks how the phone is held — landscape clips saved as portrait
+// 180726 Recording length is caller-selected (maxDurationMs) instead of fixed MAX_RECORDING_MS
 package com.motionamp.app.camera
 
 import android.annotation.SuppressLint
@@ -24,7 +25,6 @@ import android.util.Range
 import android.util.Size
 import android.view.OrientationEventListener
 import android.view.Surface
-import com.motionamp.core.CaptureConstants
 import java.io.File
 
 /**
@@ -151,7 +151,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
         }, handler)
     }
 
-    fun startRecording(frameRate: Int, outputFile: File, listener: Listener) {
+    fun startRecording(frameRate: Int, maxDurationMs: Int, outputFile: File, listener: Listener) {
         val cam = device ?: return listener.onError("Camera not ready")
         val surface = previewSurface ?: return listener.onError("No preview surface")
         if (isRecording || startInFlight) return
@@ -162,7 +162,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
         session?.close(); session = null
         val size = caps.highSpeedRates[frameRate] ?: Size(1280, 720)
         val rec = try {
-            buildRecorder(frameRate, size, outputFile)
+            buildRecorder(frameRate, maxDurationMs, size, outputFile)
         } catch (e: Exception) {
             return failRecording("Recorder setup failed: ${e.message}")
         }
@@ -254,7 +254,12 @@ class CameraController(context: Context, private val caps: CameraCaps) {
         thread.quitSafely()
     }
 
-    private fun buildRecorder(frameRate: Int, size: Size, outputFile: File): MediaRecorder {
+    private fun buildRecorder(
+        frameRate: Int,
+        maxDurationMs: Int,
+        size: Size,
+        outputFile: File,
+    ): MediaRecorder {
         @Suppress("DEPRECATION")
         val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(appContext) else MediaRecorder()
         r.setVideoSource(MediaRecorder.VideoSource.SURFACE)
@@ -272,7 +277,7 @@ class CameraController(context: Context, private val caps: CameraCaps) {
                 (sensorOrientation + deviceOrientation) % 360
             },
         )
-        r.setMaxDuration(CaptureConstants.MAX_RECORDING_MS)
+        r.setMaxDuration(maxDurationMs)
         r.setOutputFile(outputFile.absolutePath)
         r.setOnInfoListener { _, what, _ ->
             if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {

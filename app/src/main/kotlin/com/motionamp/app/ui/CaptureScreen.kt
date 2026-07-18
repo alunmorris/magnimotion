@@ -7,6 +7,7 @@
 // 150726 App icon added beside the title
 // 150726 Start Delay preset row with cancellable on-screen countdown
 // 160726 Info button beside the title opens a usage guide dialog
+// 180726 Recording Time preset row (2/5/10/60 s); ring and auto-stop follow the selection
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
@@ -66,8 +67,8 @@ import com.motionamp.app.camera.CameraCapabilities
 import com.motionamp.app.camera.CameraCaps
 import com.motionamp.app.camera.CameraController
 import com.motionamp.core.AmplificationPreset
-import com.motionamp.core.CaptureConstants
 import com.motionamp.core.FRAME_RATE_OPTIONS
+import com.motionamp.core.RecordingTimePreset
 import com.motionamp.core.SlowMotionPreset
 import com.motionamp.core.StartDelayPreset
 import kotlinx.coroutines.Job
@@ -88,6 +89,7 @@ fun CaptureScreen(viewModel: MainViewModel) {
     val amplification by viewModel.amplification.collectAsState()
     val slowMotion by viewModel.slowMotion.collectAsState()
     val startDelay by viewModel.startDelay.collectAsState()
+    val recordingTime by viewModel.recordingTime.collectAsState()
     var countdown by remember { mutableStateOf<Int?>(null) }
     var countdownJob by remember { mutableStateOf<Job?>(null) }
     var showInfo by remember { mutableStateOf(false) }
@@ -105,13 +107,14 @@ fun CaptureScreen(viewModel: MainViewModel) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Countdown ring: recording auto-stops at MAX_RECORDING_MS.
+    // Countdown ring: recording auto-stops at the selected Recording Time.
     LaunchedEffect(isRecording) {
         if (isRecording) {
             val start = System.currentTimeMillis()
+            val durationMs = recordingTime.millis // locked while recording
             while (isRecording) {
                 recordProgress = ((System.currentTimeMillis() - start).toFloat() /
-                    CaptureConstants.MAX_RECORDING_MS).coerceAtMost(1f)
+                    durationMs).coerceAtMost(1f)
                 delay(100)
             }
         } else {
@@ -214,6 +217,14 @@ fun CaptureScreen(viewModel: MainViewModel) {
                 onSelect = { viewModel.slowMotion.value = it },
             )
             PresetRow(
+                title = "Recording\nTime",
+                options = RecordingTimePreset.entries,
+                selected = recordingTime,
+                enabled = { !isRecording },
+                label = { it.label },
+                onSelect = { viewModel.recordingTime.value = it },
+            )
+            PresetRow(
                 title = "Start Delay",
                 options = StartDelayPreset.entries,
                 selected = startDelay,
@@ -263,7 +274,7 @@ fun CaptureScreen(viewModel: MainViewModel) {
             }
             fun beginRecording() {
                 isRecording = true
-                controller.startRecording(frameRate, viewModel.rawFile, listener)
+                controller.startRecording(frameRate, recordingTime.millis, viewModel.rawFile, listener)
             }
             Box(
                 modifier = Modifier
@@ -311,9 +322,11 @@ private val USAGE_TEXT = """
 
     Playback Speed — extra slow motion on top of the frame-rate slowdown (½× plays 2× slower again).
 
+    Recording Time — how long the clip runs before stopping automatically.
+
     Start Delay — countdown before recording begins. Tap the yellow button to cancel it.
 
-    Recording: tap the red button; it stops automatically after 10 seconds, or tap again to stop early. Focus locks the moment recording starts, so point at your subject first. Keep the phone as still as possible — prop it up or use a tripod. Small repetitive movements amplify most cleanly.
+    Recording: tap the red button; it stops automatically after the selected Recording Time, or tap again to stop early. Focus locks the moment recording starts, so point at your subject first. Keep the phone as still as possible — prop it up or use a tripod. Small repetitive movements amplify most cleanly.
 
     Afterwards the result loops on screen. Tap the video for pause and seek controls, then Retake or Save to gallery.
 """.trimIndent()

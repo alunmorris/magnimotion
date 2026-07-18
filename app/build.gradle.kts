@@ -35,9 +35,14 @@ android {
     }
     buildTypes {
         release {
-            // No minification: size comes from dropping non-arm64 OpenCV natives,
-            // and shrinking risks breaking OpenCV/Media3 reflection paths.
-            isMinifyEnabled = false
+            // R8 obfuscates and shrinks app code; OpenCV's Java surface is kept whole
+            // (JNI resolves it by name — see proguard-rules.pro), Media3 ships its own
+            // consumer rules.
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             // Every modern phone is arm64; the debug build keeps all ABIs.
             ndk { abiFilters += "arm64-v8a" }
             if (keystoreProps.isNotEmpty()) {

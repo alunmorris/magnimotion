@@ -3,6 +3,7 @@
 // 140726 Slow motion stacks on frame-rate normalisation via totalFactorFor
 // 150726 Added startDelay preset state
 // 160726 saveTag: capture settings fragment (e.g. f120m15) for gallery file names
+// 180726 Added recordingTime preset state (2/5/10/60 s)
 package com.motionamp.app
 
 import android.app.Application
@@ -11,6 +12,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.motionamp.app.video.AmplifyVideoUseCase
 import com.motionamp.core.AmplificationPreset
+import com.motionamp.core.RecordingTimePreset
 import com.motionamp.core.SlowMotionPreset
 import com.motionamp.core.StartDelayPreset
 import kotlinx.coroutines.CancellationException
@@ -35,6 +37,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val amplification = MutableStateFlow(AmplificationPreset.MEDIUM)
     val slowMotion = MutableStateFlow(SlowMotionPreset.X1)
     val startDelay = MutableStateFlow(StartDelayPreset.S0)
+    val recordingTime = MutableStateFlow(RecordingTimePreset.S10)
     val errorMessage = MutableStateFlow<String?>(null)
 
     /** Filename fragment describing the clip's settings, e.g. "f120m15"; the presets

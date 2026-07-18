@@ -1,5 +1,6 @@
 // 130726 Initial implementation
 // 140726 Added matchingCapture mapping test
+// 180726 RecordingTimePreset (2/5/10/60 s) replaces fixed MAX_RECORDING_MS
 package com.motionamp.core
 
 import org.junit.Assert.assertEquals
@@ -42,7 +43,8 @@ class PresetsTest {
     }
 
     @Test
-    fun captureConstantsMatchSpec() {
-        assertEquals(10_000, CaptureConstants.MAX_RECORDING_MS)
+    fun recordingTimesMatchSpec() {
+        assertEquals(listOf(2, 5, 10, 60), RecordingTimePreset.entries.map { it.seconds })
+        assertEquals(10_000, RecordingTimePreset.S10.millis)
     }
 }
