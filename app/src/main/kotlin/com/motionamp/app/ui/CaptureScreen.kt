@@ -192,8 +192,8 @@ fun CaptureScreen(viewModel: MainViewModel) {
                 Image(
                     painter = painterResource(R.drawable.ic_app_icon),
                     contentDescription = null,
-                    // Matches the title column: titleMedium (24sp) + labelSmall (16sp) lines.
-                    modifier = Modifier.size(40.dp),
+                    // Slightly under the title column height (24sp + 16sp lines), by taste.
+                    modifier = Modifier.size(38.dp),
                 )
                 IconButton(onClick = { showInfo = true }) {
                     Icon(
