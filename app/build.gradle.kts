@@ -56,7 +56,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        // BuildConfig.DEBUG gates the runtime signature check to release builds.
+        buildConfig = true
+    }
 }
 
 dependencies {

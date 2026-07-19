@@ -1,3 +1,4 @@
+// 190726 Verify signing certificate at startup in release builds
 // 130726 Initial implementation
 package com.motionamp.app
 
@@ -7,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.motionamp.app.security.SignatureVerifier
 import com.motionamp.app.ui.CaptureScreen
 import com.motionamp.app.ui.PlaybackScreen
 import com.motionamp.app.ui.ProcessingScreen
@@ -41,6 +44,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Debug builds are signed with the machine-local debug key, so only
+        // release builds are held to the pinned release certificate.
+        if (!BuildConfig.DEBUG && !SignatureVerifier.isGenuine(this)) {
+            Log.e("MotionAmp", "Signing certificate mismatch; refusing to run")
+            Toast.makeText(
+                this,
+                "This copy of MagniMotion failed its signature check and cannot run.",
+                Toast.LENGTH_LONG,
+            ).show()
+            finish()
+            return
+        }
         setContent { MaterialTheme { AppRoot(viewModel) } }
     }
 }
