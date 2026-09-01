@@ -50,6 +50,11 @@ Requires JDK 17 and the Android SDK (`compileSdk`/`targetSdk` 35, `minSdk` 26).
                                  # unsigned without it)
 ./gradlew :core:test            # algorithm unit tests
 ```
+## Install APK without building
+
+A ready-made APK is at [https://github.com/alunmorris/magnimotion/releases/download](https://github.com/alunmorris/magnimotion/releases/tag/v0.1) 
+
+How to? https://anexplorer.io/install/apk-on-android
 
 ## Permissions
 
