@@ -54,6 +54,8 @@ Requires JDK 17 and the Android SDK (`compileSdk`/`targetSdk` 35, `minSdk` 26).
 
 A ready-made APK is at [https://github.com/alunmorris/magnimotion/releases/download](https://github.com/alunmorris/magnimotion/releases/tag/v0.1) 
 
+Runs on Android 8.0 or later.
+
 How to? https://anexplorer.io/install/apk-on-android
 
 ## Permissions
