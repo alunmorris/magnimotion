@@ -52,7 +52,7 @@ Requires JDK 17 and the Android SDK (`compileSdk`/`targetSdk` 35, `minSdk` 26).
 ```
 ## Install APK without building
 
-A ready-made APK is at [https://github.com/alunmorris/magnimotion/releases/download](https://github.com/alunmorris/magnimotion/releases/tag/v0.1) 
+A ready-made APK is at [github.com/alunmorris/magnimotion/releases/download/v0.1/magnimotion-v0.1.apk](https://github.com/alunmorris/magnimotion/releases/download/v0.1/magnimotion-v0.1.apk)
 
 Runs on Android 8.0 or later.
 
