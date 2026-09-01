@@ -3,10 +3,15 @@
 // 140726 Fix: keep buttons out of the system navigation bar area (edge-to-edge insets)
 // 150726 Player controls enabled: time bar, seek, play/pause
 // 160726 Saved file name carries the capture settings tag (e.g. f120m15)
+// 010926 Landscape-recorded clips play back in landscape instead of the portrait lock
 package com.motionamp.app.ui
 
 import android.Manifest
+import android.app.Activity
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -23,6 +28,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -40,6 +46,33 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private tailrec fun android.content.Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+/** True if the clip's stored rotation means it plays back wider than it is tall. */
+private fun isLandscapeVideo(path: String): Boolean {
+    val retriever = MediaMetadataRetriever()
+    return try {
+        retriever.setDataSource(path)
+        val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+            ?.toIntOrNull() ?: 0
+        val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+            ?.toIntOrNull() ?: 0
+        val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+            ?.toIntOrNull() ?: 0
+        val (displayWidth, displayHeight) =
+            if (rotation == 90 || rotation == 270) height to width else width to height
+        displayWidth > displayHeight
+    } catch (e: Exception) {
+        false
+    } finally {
+        retriever.release()
+    }
+}
+
 @Composable
 fun PlaybackScreen(
     videoPath: String,
@@ -48,6 +81,7 @@ fun PlaybackScreen(
     onSaved: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
     val scope = rememberCoroutineScope()
     val player = remember {
         ExoPlayer.Builder(context).build().apply {
@@ -57,7 +91,23 @@ fun PlaybackScreen(
             playWhenReady = true
         }
     }
-    DisposableEffect(Unit) { onDispose { player.release() } }
+
+    // The activity is portrait-locked for capture; a landscape-recorded clip
+    // needs the screen rotated to landscape to display at full size.
+    LaunchedEffect(videoPath) {
+        val landscape = withContext(Dispatchers.IO) { isLandscapeVideo(videoPath) }
+        activity?.requestedOrientation = if (landscape) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            player.release()
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
 
     fun save() {
         scope.launch {

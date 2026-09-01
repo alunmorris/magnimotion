@@ -10,6 +10,7 @@
 // 180726 Recording Time preset row (2/5/10/60 s); ring and auto-stop follow the selection
 // 180726 App renamed MagniMotion; old title kept as subtitle
 // 180726 Subtitle now "Video Motion Magnification"; icon matches the two-line title height
+// 010926 Info dialog shows version number and date
 package com.motionamp.app.ui
 
 import android.graphics.SurfaceTexture
@@ -63,6 +64,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.motionamp.app.BuildConfig
 import com.motionamp.app.MainViewModel
 import com.motionamp.app.R
 import com.motionamp.app.camera.CameraCapabilities
@@ -252,10 +254,15 @@ fun CaptureScreen(viewModel: MainViewModel) {
                 },
                 title = { Text("How to use") },
                 text = {
-                    Text(
-                        text = USAGE_TEXT,
-                        modifier = Modifier.verticalScroll(rememberScrollState()),
-                    )
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        Text(text = USAGE_TEXT)
+                        Text(
+                            text = "Version ${BuildConfig.VERSION_NAME} — $BUILD_DATE",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
                 },
             )
         }
@@ -340,6 +347,8 @@ private val USAGE_TEXT = """
 
     Afterwards the result loops on screen. Tap the video for pause and seek controls, then Retake or Save to gallery.
 """.trimIndent()
+
+private const val BUILD_DATE = "1 September 2026"
 
 @Composable
 private fun <T> PresetRow(

@@ -8,6 +8,8 @@ import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
 
+private const val BUILD_TAG = "3cbcd331-fbf8-4468-858d-76be1b4e8aef"
+
 /**
  * Synchronous YUV -> H.264 MP4 encoder. Slow motion is baked in by the caller
  * passing pre-stretched [encodeFrame] timestamps; the muxer just writes them.
@@ -25,6 +27,8 @@ class VideoEncoder(
     private var trackIndex = -1
     private var muxerStarted = false
     private val bufferInfo = MediaCodec.BufferInfo()
+
+    override fun toString(): String = "VideoEncoder(${width}x$height, build=$BUILD_TAG)"
 
     init {
         val format = MediaFormat.createVideoFormat(

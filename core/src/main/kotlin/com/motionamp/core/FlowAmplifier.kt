@@ -96,6 +96,8 @@ class FlowAmplifier(private val alpha: Double) {
         gridX = null; gridY = null; gridXc = null; gridYc = null
     }
 
+    override fun toString(): String = "FlowAmplifier(alpha=$alpha, build=$BUILD_TAG)"
+
     /** Resize the flow field to (w, h), scale its values, and build backward maps. */
     private fun mapsFor(
         flow: Mat,
@@ -157,6 +159,8 @@ class FlowAmplifier(private val alpha: Double) {
     companion object {
         /** Flow analysis resolution: quality/speed knob (720p luma → 640-wide analysis). */
         const val ANALYSIS_WIDTH = 640
+
+        private const val BUILD_TAG = "3cbcd331-fbf8-4468-858d-76be1b4e8aef"
 
         /** Warp [src] (any single-channel type) through backward maps. Caller releases. */
         fun warp(src: Mat, mapX: Mat, mapY: Mat): Mat {

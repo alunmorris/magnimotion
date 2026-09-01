@@ -147,7 +147,8 @@ class AmplifyVideoUseCase {
                 worker.join()
                 workerError.get()?.let { throw it }
                 ensureActive() // cancelled mid-decode: fall through to catch, not success
-                val enc = encoderRef.get() ?: error("no frames decoded from ${params.inputPath}")
+                val enc = encoderRef.get()
+                    ?: error("no frames decoded from ${params.inputPath} [$BUILD_TAG]")
                 encoderRef.set(null) // finish() tears the encoder down even on failure; never call it twice
                 enc.finish()
                 succeeded = true
@@ -172,5 +173,6 @@ class AmplifyVideoUseCase {
 
     private companion object {
         val END = Any()
+        const val BUILD_TAG = "3cbcd331-fbf8-4468-858d-76be1b4e8aef"
     }
 }
