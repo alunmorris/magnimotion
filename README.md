@@ -4,6 +4,8 @@ An Android app that records a short video clip and exaggerates whatever motion i
 in it — vibration, breathing, sway, small mechanical movement — turning it into
 something clearly visible.
 
+<img width="270" height="524" alt="MagniMotion_screenshot" src="https://github.com/user-attachments/assets/fbc11a1b-5228-49c3-a77d-b0be6369657d" />
+
 https://youtube.com/video/wjAJO5KNZI4
 
 It does this with optical-flow warping (Lagrangian motion magnification): dense
