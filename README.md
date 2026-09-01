@@ -4,7 +4,7 @@ An Android app that records a short video clip and exaggerates whatever motion i
 in it — vibration, breathing, sway, small mechanical movement — turning it into
 something clearly visible.
 
-youtube.com/video/wjAJO5KNZI4
+https://youtube.com/video/wjAJO5KNZI4
 
 It does this with optical-flow warping (Lagrangian motion magnification): dense
 Farneback flow is computed between each frame and the clip's middle frame, the
